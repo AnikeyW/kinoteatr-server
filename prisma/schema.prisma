@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Series {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  seasons     Season[] @relation("SeriesToSeason")
+}
+
+model Season {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String
+  order       Int       @unique
+  series      Series    @relation("SeriesToSeason", fields: [seriesId], references: [id])
+  seriesId    Int       @map("series_id")
+  episodes    Episode[] @relation("SeasonToEpisode")
+}
+
+model Episode {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  order       Int      @unique
+  skipRepeat  Int?     @map("skip_repeat")
+  skipIntro   Int?     @map("skip_intro")
+  skipCredits Int?     @map("skip_credits")
+  videos      Video[]
+  voices      String[]
+  qualities   String[]
+  season      Season   @relation("SeasonToEpisode", fields: [seasonId], references: [id])
+  seasonId    Int      @map("season_id")
+}
+
+model Video {
+  id        Int     @id @default(autoincrement())
+  episode   Episode @relation(fields: [episodeId], references: [id])
+  episodeId Int     @map("episode_id")
+  quality   String
+  voice     String
+  src       String
+}
+
+// model Series {
+//   id          Int       @id @default(autoincrement())
+//   title       String
+//   description String
+//   episodes    Episode[] @relation("SeriesToEpisode")
+// }
+//
+// model Episode {
+//   id          Int      @id @default(autoincrement())
+//   title       String
+//   description String
+//   series      Series   @relation("SeriesToEpisode", fields: [seriesId], references: [id])
+//   seriesId    Int      @map("series_id")
+//   videos      Video[]
+//   voices      String[]
+//   qualities   String[]
+// }
+//
+// model Video {
+//   id        Int     @id @default(autoincrement())
+//   episode   Episode @relation(fields: [episodeId], references: [id])
+//   episodeId Int     @map("episode_id")
+//   quality   String
+//   voice     String
+//   src       String
+// }

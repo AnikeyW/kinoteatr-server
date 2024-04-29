@@ -1,0 +1,48 @@
+import {
+  Body,
+  Controller,
+  HttpException,
+  HttpStatus,
+  Post,
+  UploadedFiles,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { CreateEpisodeDto } from './dto/create-episode.dto';
+import { EpisodeService } from './episode.service';
+import { diskStorage } from 'multer';
+import * as path from 'path';
+import * as mime from 'mime-types';
+import * as uuid from 'uuid';
+import * as fs from 'fs';
+
+const storage = diskStorage({
+  destination: function (req, file, cb) {
+    const tmpFolderPath = path.join(__dirname, '..', '..', '/tmp/uploads');
+    if (!fs.existsSync(tmpFolderPath)) {
+      fs.mkdirSync(tmpFolderPath, { recursive: true });
+    }
+    cb(null, tmpFolderPath);
+  },
+  filename: function (req, file, cb) {
+    const fileExtension = mime.extension(file.mimetype);
+    const fileName = uuid.v4() + '.' + fileExtension;
+    cb(null, fileName);
+  },
+});
+
+@Controller('episode')
+export class EpisodeController {
+  constructor(private episodeService: EpisodeService) {}
+
+  @Post()
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'video', maxCount: 1 }], { storage: storage }))
+  createEpisode(@UploadedFiles() files, @Body() dto: CreateEpisodeDto) {
+    const { video } = files;
+    if (!video) {
+      throw new HttpException('Не загружено видео', HttpStatus.BAD_REQUEST);
+    }
+
+    return this.episodeService.createEpisode(video[0].path, dto);
+  }
+}
