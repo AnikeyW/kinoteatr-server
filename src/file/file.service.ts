@@ -6,6 +6,7 @@ import * as mime from 'mime-types';
 
 export enum FileTypes {
   VIDEO = 'video',
+  IMAGE = 'image',
 }
 
 @Injectable()
@@ -39,7 +40,7 @@ export class FileService {
     }
   }
 
-  moveFile(pathFrom: string, pathTo: string): string {
+  moveFileToStatic(pathFrom: string, pathTo: string): string {
     try {
       const fileName = path.basename(pathFrom);
 
@@ -49,7 +50,7 @@ export class FileService {
 
       fs.renameSync(pathFrom, path.join(pathTo, fileName));
 
-      return path.join(pathTo, fileName);
+      return path.relative(path.join(__dirname, '..', '..', 'static'), path.join(pathTo, fileName));
     } catch (error) {
       throw new HttpException('Ошибка перемещения видео', HttpStatus.INTERNAL_SERVER_ERROR);
     }

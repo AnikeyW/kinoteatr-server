@@ -36,13 +36,23 @@ export class EpisodeController {
   constructor(private episodeService: EpisodeService) {}
 
   @Post()
-  @UseInterceptors(FileFieldsInterceptor([{ name: 'video', maxCount: 1 }], { storage: storage }))
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'video', maxCount: 1 },
+        { name: 'poster', maxCount: 1 },
+      ],
+      { storage: storage },
+    ),
+  )
   createEpisode(@UploadedFiles() files, @Body() dto: CreateEpisodeDto) {
-    const { video } = files;
+    const { video, poster } = files;
     if (!video) {
       throw new HttpException('Не загружено видео', HttpStatus.BAD_REQUEST);
     }
-
-    return this.episodeService.createEpisode(video[0].path, dto);
+    if (!poster) {
+      throw new HttpException('Не загружен постер', HttpStatus.BAD_REQUEST);
+    }
+    return this.episodeService.createEpisode(video[0].path, poster[0].path, dto);
   }
 }

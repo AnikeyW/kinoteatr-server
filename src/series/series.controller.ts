@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { SeriesService } from './series.service';
 import { CreateSeriesDto } from './dto/create-series.dto';
 
@@ -14,5 +14,12 @@ export class SeriesController {
   @Get(':id')
   getById(@Param('id') seriesId) {
     return this.seriesService.getById(Number(seriesId));
+  }
+
+  @Get()
+  getManySeries(@Query() query: { skip: string; take: string }) {
+    const { skip, take } = query;
+
+    return this.seriesService.getManySeries(skip ? Number(skip) : 0, take ? Number(take) : 20);
   }
 }

@@ -29,4 +29,8 @@ export class SeriesService {
       },
     });
   }
+
+  async getManySeries(skip: number, take: number): Promise<Series[]> {
+    return this.prismaService.series.findMany({ skip, take });
+  }
 }

@@ -27,22 +27,15 @@ CREATE TABLE "Episode" (
     "skip_repeat" INTEGER,
     "skip_intro" INTEGER,
     "skip_credits" INTEGER,
-    "voices" TEXT[],
-    "qualities" TEXT[],
     "season_id" INTEGER NOT NULL,
+    "views" INTEGER NOT NULL DEFAULT 0,
+    "duration" INTEGER NOT NULL,
+    "poster" TEXT NOT NULL,
+    "is_processing" BOOLEAN NOT NULL,
+    "src" TEXT NOT NULL,
+    "release_date" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Episode_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "Video" (
-    "id" SERIAL NOT NULL,
-    "episode_id" INTEGER NOT NULL,
-    "quality" TEXT NOT NULL,
-    "voice" TEXT NOT NULL,
-    "src" TEXT NOT NULL,
-
-    CONSTRAINT "Video_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -56,6 +49,3 @@ ALTER TABLE "Season" ADD CONSTRAINT "Season_series_id_fkey" FOREIGN KEY ("series
 
 -- AddForeignKey
 ALTER TABLE "Episode" ADD CONSTRAINT "Episode_season_id_fkey" FOREIGN KEY ("season_id") REFERENCES "Season"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Video" ADD CONSTRAINT "Video_episode_id_fkey" FOREIGN KEY ("episode_id") REFERENCES "Episode"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

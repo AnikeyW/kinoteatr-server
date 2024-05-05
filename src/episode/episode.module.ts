@@ -2,11 +2,11 @@ import { Module } from '@nestjs/common';
 import { EpisodeController } from './episode.controller';
 import { EpisodeService } from './episode.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { VideoService } from '../video/video.service';
 import { FileService } from '../file/file.service';
+import { FfmpegService } from '../ffmpeg/ffmpeg.service';
 
 @Module({
   controllers: [EpisodeController],
-  providers: [EpisodeService, PrismaService, VideoService, FileService],
+  providers: [EpisodeService, PrismaService, FileService, FfmpegService],
 })
 export class EpisodeModule {}

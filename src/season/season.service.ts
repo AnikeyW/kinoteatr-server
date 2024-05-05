@@ -27,18 +27,18 @@ export class SeasonService {
       include: {
         episodes: {
           where: { seasonId },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            order: true,
-            skipIntro: true,
-            skipRepeat: true,
-            skipCredits: true,
-            qualities: true,
-            voices: true,
-            videos: true,
-          },
+          // select: {
+          //   id: true,
+          //   title: true,
+          //   description: true,
+          //   order: true,
+          //   skipIntro: true,
+          //   skipRepeat: true,
+          //   skipCredits: true,
+          //   qualities: true,
+          //   voices: true,
+          //   videos: true,
+          // },
         },
       },
     });
