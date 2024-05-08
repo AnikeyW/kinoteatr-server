@@ -1,14 +1,31 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  UploadedFiles,
+  UseInterceptors,
+} from '@nestjs/common';
 import { SeriesService } from './series.service';
 import { CreateSeriesDto } from './dto/create-series.dto';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 
 @Controller('series')
 export class SeriesController {
   constructor(private seriesService: SeriesService) {}
 
   @Post()
-  createSeries(@Body() dto: CreateSeriesDto) {
-    return this.seriesService.createSeries(dto);
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'poster', maxCount: 1 }]))
+  createSeries(@UploadedFiles() files, @Body() dto: CreateSeriesDto) {
+    const { poster } = files;
+    if (!poster) {
+      throw new HttpException('Не загружен постер', HttpStatus.BAD_REQUEST);
+    }
+    return this.seriesService.createSeries(poster[0], dto);
   }
 
   @Get(':id')

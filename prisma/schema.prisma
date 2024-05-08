@@ -11,6 +11,8 @@ model Series {
   id          Int      @id @default(autoincrement())
   title       String
   description String
+  releaseYear Int      @map("release_year")
+  poster      String
   seasons     Season[] @relation("SeriesToSeason")
 }
 
@@ -40,4 +42,18 @@ model Episode {
   isProcessing Boolean @map("is_processing")
   src          String
   releaseDate  Int     @map("release_date")
+}
+
+model Admin {
+  id       Int     @id @default(autoincrement())
+  email    String  @unique
+  password String
+  Token    Token[]
+}
+
+model Token {
+  id           Int    @id @default(autoincrement())
+  refreshToken String @unique
+  admin        Admin  @relation(fields: [adminId], references: [id])
+  adminId      Int    @unique
 }

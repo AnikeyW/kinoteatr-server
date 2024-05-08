@@ -1,9 +1,12 @@
 import {
   Body,
   Controller,
+  Get,
   HttpException,
   HttpStatus,
+  Param,
   Post,
+  Query,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
@@ -54,5 +57,14 @@ export class EpisodeController {
       throw new HttpException('Не загружен постер', HttpStatus.BAD_REQUEST);
     }
     return this.episodeService.createEpisode(video[0].path, poster[0].path, dto);
+  }
+
+  @Get(':order')
+  getByOrder(
+    @Param('order') order,
+    @Query('season_order') seasonOrder,
+    @Query('series_id') seriesId,
+  ) {
+    return this.episodeService.getByOrder(Number(seasonOrder), Number(seriesId), Number(order));
   }
 }

@@ -27,6 +27,7 @@
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
 ## Installation
+<h2 style="color:red">Необходимо установить ffmpeg на машину</h2>
 
 ```bash
 $ npm install

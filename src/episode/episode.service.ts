@@ -105,6 +105,29 @@ export class EpisodeService {
     return episode;
   }
 
+  async getByOrder(seasonOrder: number, seriesId: number, episodeOrder: number): Promise<Episode> {
+    const season = await this.prismaService.season.findUnique({
+      where: { seriesId: seriesId, order: seasonOrder },
+    });
+
+    if (!season) {
+      throw new HttpException('Сезон с таким порядковым номером не найден', HttpStatus.NOT_FOUND);
+    }
+
+    const episode = await this.prismaService.episode.findUnique({
+      where: {
+        seasonId: season.id,
+        order: episodeOrder,
+      },
+    });
+
+    if (!episode) {
+      throw new HttpException('Епизод не найден', HttpStatus.NOT_FOUND);
+    }
+
+    return episode;
+  }
+
   private async createEpisodeFolder(episodeName: string) {
     const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'video', episodeName);
     await mkdirAsync(folderVideoPath, { recursive: true });

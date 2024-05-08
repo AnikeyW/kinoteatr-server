@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { exec, spawn } from 'child_process';
 import * as path from 'path';
-import { promisify } from 'util';
-
-// const execAsync = promisify(exec);
 
 @Injectable()
 export class FfmpegService {

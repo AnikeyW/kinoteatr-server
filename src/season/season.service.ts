@@ -27,18 +27,6 @@ export class SeasonService {
       include: {
         episodes: {
           where: { seasonId },
-          // select: {
-          //   id: true,
-          //   title: true,
-          //   description: true,
-          //   order: true,
-          //   skipIntro: true,
-          //   skipRepeat: true,
-          //   skipCredits: true,
-          //   qualities: true,
-          //   voices: true,
-          //   videos: true,
-          // },
         },
       },
     });
@@ -48,5 +36,30 @@ export class SeasonService {
     }
 
     return season;
+  }
+
+  async getByOrder(seriesId: number, order: number): Promise<Season> {
+    const season = await this.prismaService.season.findUnique({
+      where: { seriesId: seriesId, order: order },
+    });
+
+    if (!season) {
+      throw new HttpException('Сезон с таким порядковым номером не найден', HttpStatus.NOT_FOUND);
+    }
+
+    const seasonWithEpisodes = await this.prismaService.season.findUnique({
+      where: { seriesId: seriesId, id: season.id },
+      include: {
+        episodes: {
+          where: { seasonId: season.id },
+        },
+      },
+    });
+
+    if (!seasonWithEpisodes) {
+      throw new HttpException('Сезон с таким Id не найден', HttpStatus.NOT_FOUND);
+    }
+
+    return seasonWithEpisodes;
   }
 }

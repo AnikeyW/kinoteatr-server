@@ -11,9 +11,14 @@ export class SeasonController {
     return this.seasonService.createSeason(dto);
   }
 
-  @Get(':id')
-  getById(@Param('id') seasonId, @Query('series_id') seriesId) {
-    console.log(seriesId);
-    return this.seasonService.getById(Number(seasonId), Number(seriesId));
+  // @Get(':id')
+  // getById(@Param('id') seasonId, @Query('series_id') seriesId) {
+  //   return this.seasonService.getById(Number(seasonId), Number(seriesId));
+  // }
+
+  @Get(':order')
+  getByOrder(@Param('order') order, @Query('series_id') seriesId) {
+    //todo:series_id to series_order
+    return this.seasonService.getByOrder(Number(seriesId), Number(order));
   }
 }
