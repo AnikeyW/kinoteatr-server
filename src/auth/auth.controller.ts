@@ -19,10 +19,10 @@ import { CreateAdminDto } from './dto/create-admin.dto';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  // @Post('registration')
-  // registration(@Body() dto: CreateAdminDto) {
-  //   return this.authService.registration(dto);
-  // }
+  @Post('registration')
+  registration(@Body() dto: CreateAdminDto) {
+    return this.authService.registration(dto);
+  }
 
   @UseGuards(LocalAuthGuard)
   @Post('login')

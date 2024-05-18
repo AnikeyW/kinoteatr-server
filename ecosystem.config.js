@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'holotv-server',
       script: 'node',
-      args: 'dist/main.js', // Убедитесь, что путь к main.js верный
+      args: 'dist/main.js',
       autorestart: true,
       watch: false,
       max_memory_restart: '1G',

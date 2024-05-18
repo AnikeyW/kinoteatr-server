@@ -22,6 +22,7 @@ services:
   postgres_prod:
     image: postgres:14-alpine
     container_name: postgres_prod
+    restart: always
     environment:
       POSTGRES_USER: prod_user
       POSTGRES_PASSWORD: prod_admin
