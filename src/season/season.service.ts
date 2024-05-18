@@ -2,14 +2,19 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSeasonDto } from './dto/create-season.dto';
 import { Season } from '@prisma/client';
+import { FileService, FileTypes } from '../file/file.service';
+import { EditSeasonDto } from './dto/edit-season.dto';
 
 @Injectable()
 export class SeasonService {
-  constructor(private prismaService: PrismaService) {}
+  constructor(
+    private prismaService: PrismaService,
+    private fileService: FileService,
+  ) {}
 
-  async createSeason(dto: CreateSeasonDto): Promise<Season> {
+  async createSeason(dto: CreateSeasonDto, poster: File): Promise<Season> {
     const isExistOrderNumber = await this.prismaService.season.findFirst({
-      where: { order: Number(dto.order), seriesId: dto.seriesId },
+      where: { order: Number(dto.order), seriesId: Number(dto.seriesId) },
     });
     if (isExistOrderNumber) {
       throw new HttpException(
@@ -18,7 +23,46 @@ export class SeasonService {
       );
     }
 
-    return this.prismaService.season.create({ data: dto });
+    const posterPath = await this.fileService.createFile(FileTypes.IMAGE, poster);
+
+    return this.prismaService.season.create({
+      data: {
+        ...dto,
+        seriesId: Number(dto.seriesId),
+        order: Number(dto.order),
+        poster: posterPath,
+      },
+    });
+  }
+
+  async editSeason(seasonId: number, dto: EditSeasonDto, poster: File | null): Promise<Season> {
+    if (!poster) {
+      return this.prismaService.season.update({
+        where: { id: seasonId },
+        data: {
+          title: dto.title,
+          description: dto.description,
+          order: Number(dto.order),
+        },
+      });
+    } else {
+      const season = await this.prismaService.season.findUnique({ where: { id: seasonId } });
+      try {
+        await this.fileService.removeFile(season.poster);
+      } catch (e) {
+        console.log('при удалении постера что то пошло не так', e);
+      }
+      const posterPath = await this.fileService.createFile(FileTypes.IMAGE, poster);
+
+      return this.prismaService.season.update({
+        where: { id: seasonId },
+        data: {
+          ...dto,
+          order: Number(dto.order),
+          poster: posterPath,
+        },
+      });
+    }
   }
 
   async getById(seasonId: number, seriesId: number): Promise<Season> {

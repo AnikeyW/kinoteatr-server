@@ -7,25 +7,36 @@ import {
   Param,
   Post,
   Query,
+  UploadedFile,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { SeriesService } from './series.service';
 import { CreateSeriesDto } from './dto/create-series.dto';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { EditSeriesDto } from './dto/edit-series.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('series')
 export class SeriesController {
   constructor(private seriesService: SeriesService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post()
-  @UseInterceptors(FileFieldsInterceptor([{ name: 'poster', maxCount: 1 }]))
-  createSeries(@UploadedFiles() files, @Body() dto: CreateSeriesDto) {
-    const { poster } = files;
+  @UseInterceptors(FileInterceptor('poster'))
+  createSeries(@UploadedFile() poster, @Body() dto: CreateSeriesDto) {
     if (!poster) {
       throw new HttpException('Не загружен постер', HttpStatus.BAD_REQUEST);
     }
-    return this.seriesService.createSeries(poster[0], dto);
+    return this.seriesService.createSeries(poster, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id')
+  @UseInterceptors(FileInterceptor('poster'))
+  editSeries(@UploadedFile() poster, @Body() dto: EditSeriesDto, @Param('id') seriesId) {
+    return this.seriesService.editSeriesById(dto, poster, Number(seriesId));
   }
 
   @Get(':id')

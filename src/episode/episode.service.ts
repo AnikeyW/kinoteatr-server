@@ -24,7 +24,7 @@ export class EpisodeService {
     videoTmpPath: string,
     posterTmpPath: string,
     dto: CreateEpisodeDto,
-  ): Promise<Episode | string> {
+  ): Promise<Episode> {
     const isExistOrderNumber = await this.prismaService.episode.findFirst({
       where: { order: Number(dto.order), seasonId: Number(dto.seasonId) },
     });
@@ -54,7 +54,7 @@ export class EpisodeService {
         src: '',
         poster: posterPath,
         isProcessing: true,
-        releaseDate: Number(dto.releaseDate),
+        releaseDate: new Date(Number(dto.releaseDate)),
       },
     });
 
@@ -82,7 +82,9 @@ export class EpisodeService {
     await this.createEpisodeFolder(episodeName);
 
     this.ffmpegService
-      .toHls(videoTmpPath, episodeName, resolutions)
+      // .toHls(videoTmpPath, episodeName, resolutions)
+      // .toHlsAndDash(videoTmpPath, episodeName, resolutions)
+      .toHlsUsingVideoCard(videoTmpPath, episodeName, resolutions)
       .then(async () => {
         console.log('Все потоки ffmpeg завершены.');
         await this.prismaService.episode.update({
@@ -102,6 +104,14 @@ export class EpisodeService {
         fsExtra.remove(path.join(__dirname, '..', '..', '/tmp'));
       });
 
+    return { ...episode };
+  }
+
+  async getById(episodeId: number): Promise<Episode> {
+    const episode = this.prismaService.episode.findUnique({ where: { id: episodeId } });
+    if (!episode) {
+      throw new HttpException('Епизод не найден', HttpStatus.NOT_FOUND);
+    }
     return episode;
   }
 

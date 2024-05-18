@@ -21,39 +21,38 @@ model Season {
   title       String
   description String
   order       Int       @unique
+  poster      String
   series      Series    @relation("SeriesToSeason", fields: [seriesId], references: [id])
   seriesId    Int       @map("series_id")
   episodes    Episode[] @relation("SeasonToEpisode")
 }
 
 model Episode {
-  id           Int     @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   title        String
   description  String
-  order        Int     @unique
-  skipRepeat   Int?    @map("skip_repeat")
-  skipIntro    Int?    @map("skip_intro")
-  skipCredits  Int?    @map("skip_credits")
-  season       Season  @relation("SeasonToEpisode", fields: [seasonId], references: [id])
-  seasonId     Int     @map("season_id")
-  views        Int     @default(0)
+  order        Int      @unique
+  skipRepeat   Int?     @map("skip_repeat")
+  skipIntro    Int?     @map("skip_intro")
+  skipCredits  Int?     @map("skip_credits")
+  season       Season   @relation("SeasonToEpisode", fields: [seasonId], references: [id])
+  seasonId     Int      @map("season_id")
+  views        Int      @default(0)
   duration     Int
   poster       String
-  isProcessing Boolean @map("is_processing")
+  isProcessing Boolean  @map("is_processing")
   src          String
-  releaseDate  Int     @map("release_date")
+  releaseDate  DateTime @map("release_date")
 }
 
 model Admin {
-  id       Int     @id @default(autoincrement())
-  email    String  @unique
+  id       Int    @id @default(autoincrement())
+  email    String @unique
   password String
-  Token    Token[]
 }
 
 model Token {
   id           Int    @id @default(autoincrement())
   refreshToken String @unique
-  admin        Admin  @relation(fields: [adminId], references: [id])
   adminId      Int    @unique
 }

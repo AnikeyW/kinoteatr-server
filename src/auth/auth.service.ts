@@ -39,14 +39,15 @@ export class AuthService {
   }
 
   async logout(refreshToken: string) {
-    const token = await this.prismaService.token.delete({ where: { refreshToken: refreshToken } });
-    if (!token) {
-      throw new HttpException(
-        'При выходе из учетной записи произошла ошибка',
-        HttpStatus.BAD_REQUEST,
-      );
+    const userData = this.validateRefreshToken(refreshToken);
+    if (!userData) {
+      throw new UnauthorizedException();
     }
-    return token;
+    const token = await this.prismaService.token.delete({
+      where: { adminId: userData.id },
+    });
+
+    return 'ok';
   }
 
   async refresh(refreshToken: string) {
@@ -56,6 +57,11 @@ export class AuthService {
     const userData = this.validateRefreshToken(refreshToken);
     const tokenFromDb = await this.findOneRefreshToken(refreshToken);
     if (!userData || !tokenFromDb) {
+      await this.prismaService.token.delete({
+        where: {
+          adminId: userData.id,
+        },
+      });
       throw new UnauthorizedException();
     }
 
@@ -108,7 +114,7 @@ export class AuthService {
   }
 
   private async saveToken(adminId: number, refreshToken) {
-    const tokenData = await this.prismaService.token.findFirst({ where: { adminId: adminId } });
+    const tokenData = await this.prismaService.token.findUnique({ where: { adminId: adminId } });
 
     if (tokenData) {
       return this.prismaService.token.update({
@@ -125,7 +131,7 @@ export class AuthService {
     });
   }
 
-  private validateRefreshToken(token: string): { id: number; email: string } {
+  validateRefreshToken(token: string): { id: number; email: string } {
     try {
       const userData = this.jwtService.verify(token, {
         secret: process.env.JWT_SECRET,
@@ -137,7 +143,7 @@ export class AuthService {
     }
   }
 
-  private async findOneRefreshToken(refreshToken: string): Promise<Token> {
+  async findOneRefreshToken(refreshToken: string): Promise<Token> {
     return this.prismaService.token.findFirst({ where: { refreshToken: refreshToken } });
   }
 }

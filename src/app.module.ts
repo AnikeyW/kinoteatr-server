@@ -14,12 +14,16 @@ import * as process from 'process';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      envFilePath: `.env.${process.env.NODE_ENV}`,
+    }),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'static'),
+      serveRoot: '/api/static',
     }),
     JwtModule.register({
       secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: '15m' },
+      signOptions: { expiresIn: '12h' },
       global: true,
     }),
     ConfigModule.forRoot(),

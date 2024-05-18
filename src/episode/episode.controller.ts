@@ -67,4 +67,9 @@ export class EpisodeController {
   ) {
     return this.episodeService.getByOrder(Number(seasonOrder), Number(seriesId), Number(order));
   }
+
+  @Get('byId/:id')
+  getById(@Param('id') episodeId) {
+    return this.episodeService.getById(Number(episodeId));
+  }
 }

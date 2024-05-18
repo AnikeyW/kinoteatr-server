@@ -19,5 +19,18 @@ services:
       retries: 5
       start_period: 10s
 
+  postgres_prod:
+    image: postgres:14-alpine
+    container_name: postgres_prod
+    environment:
+      POSTGRES_USER: prod_user
+      POSTGRES_PASSWORD: prod_admin
+      POSTGRES_DB: prod_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+
 volumes:
   postgres:
+  pgdata_prod:
