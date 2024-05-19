@@ -41,7 +41,8 @@ model Episode {
   duration     Int
   poster       String
   isProcessing Boolean  @map("is_processing")
-  src          String
+  srcHls       String   @map("src_hls")
+  srcDash      String   @map("src_dash")
   releaseDate  DateTime @map("release_date")
 }
 

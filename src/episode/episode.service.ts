@@ -9,6 +9,7 @@ import * as uuid from 'uuid';
 import * as fsExtra from 'fs-extra';
 import { FfmpegService } from '../ffmpeg/ffmpeg.service';
 import { FileService } from '../file/file.service';
+import { Mp4boxService } from '../mp4box/mp4box.service';
 
 const mkdirAsync = promisify(fs.mkdir);
 
@@ -17,6 +18,7 @@ export class EpisodeService {
   constructor(
     private prismaService: PrismaService,
     private ffmpegService: FfmpegService,
+    private mp4boxService: Mp4boxService,
     private fileService: FileService,
   ) {}
 
@@ -51,7 +53,8 @@ export class EpisodeService {
         skipCredits: Number(dto.skipCredits),
         seasonId: Number(dto.seasonId),
         duration: videoDuration,
-        src: '',
+        srcHls: '',
+        srcDash: '',
         poster: posterPath,
         isProcessing: true,
         releaseDate: new Date(Number(dto.releaseDate)),
@@ -77,7 +80,8 @@ export class EpisodeService {
 
     const episodeName = uuid.v4();
 
-    const videoPath = path.join('video', episodeName, 'master.m3u8');
+    const hlsPath = path.join('video', episodeName, 'master.m3u8');
+    const dashPath = path.join('video', episodeName, 'master.mpd');
 
     await this.createEpisodeFolder(episodeName);
 
@@ -85,13 +89,26 @@ export class EpisodeService {
       // .toHls(videoTmpPath, episodeName, resolutions)
       // .toHlsAndDash(videoTmpPath, episodeName, resolutions)
       .toHlsUsingVideoCard(videoTmpPath, episodeName, resolutions)
-      .then(async () => {
+      .then(() => {
         console.log('Все потоки ffmpeg завершены.');
+        // await this.prismaService.episode.update({
+        //   where: { id: episode.id },
+        //   data: {
+        //     isProcessing: false,
+        //     src: videoPath,
+        //   },
+        // });
+      })
+      .then(() => {
+        this.mp4boxService.toMpdFromHls(episodeName);
+      })
+      .then(async () => {
         await this.prismaService.episode.update({
           where: { id: episode.id },
           data: {
             isProcessing: false,
-            src: videoPath,
+            srcHls: hlsPath,
+            srcDash: dashPath,
           },
         });
       })

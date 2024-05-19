@@ -10,6 +10,7 @@ import { SeasonModule } from './season/season.module';
 import { FfmpegModule } from './ffmpeg/ffmpeg.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtModule } from '@nestjs/jwt';
+import { Mp4boxModule } from './mp4box/mp4box.module';
 import * as process from 'process';
 
 @Module({
@@ -34,6 +35,7 @@ import * as process from 'process';
     SeasonModule,
     FfmpegModule,
     AuthModule,
+    Mp4boxModule,
   ],
 })
 export class AppModule {}
