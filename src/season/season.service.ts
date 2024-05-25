@@ -71,6 +71,7 @@ export class SeasonService {
       include: {
         episodes: {
           where: { seasonId },
+          orderBy: { order: 'asc' },
         },
       },
     });
@@ -96,6 +97,7 @@ export class SeasonService {
       include: {
         episodes: {
           where: { seasonId: season.id },
+          orderBy: { order: 'asc' },
         },
       },
     });

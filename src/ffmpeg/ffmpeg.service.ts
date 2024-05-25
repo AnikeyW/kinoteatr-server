@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { exec, spawn } from 'child_process';
 import * as path from 'path';
+import { promisify } from 'util';
+
+const execPromise = promisify(exec);
 
 @Injectable()
 export class FfmpegService {
@@ -65,51 +68,6 @@ export class FfmpegService {
     });
   }
 
-  async toHlsAndDash(videoTmpPath: string, episodeName: string, resolutions: string[]) {
-    return new Promise((resolve, reject) => {
-      const bandWidths = {
-        240: 200,
-        360: 400,
-        480: 550,
-        720: 1500,
-        1080: 3000,
-        1440: 6000,
-        2160: 12000,
-        4320: 25000,
-      };
-
-      let mapsCommand = '';
-      let resBtCommand = '';
-      let varStreamMapCommand = '';
-      for (let i = 0; i < resolutions.length; i++) {
-        mapsCommand += '-map 0:0 -map 0:1 ';
-
-        const res = resolutions[i].replace('x', '*');
-        const height = Number(res.split('*')[1]);
-        resBtCommand += `-s:v:${i} ${res} -b:v:${i} ${bandWidths[height]}k `;
-
-        varStreamMapCommand += `v:${i},a:${i},name:${height}p `;
-      }
-
-      const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'video', episodeName);
-
-      const command = `ffmpeg -y -i ${videoTmpPath} -preset slow -g 48 -sc_threshold 0 ${mapsCommand}${resBtCommand}-c:a aac -var_stream_map "${varStreamMapCommand.trim()}" -master_pl_name master.m3u8 -f hls -hls_time 10 -hls_playlist_type vod -hls_list_size 0 -hls_segment_filename "${folderVideoPath}/%v/segmentNo%d.ts" ${folderVideoPath}/%v/index.m3u8`;
-
-      const com = `ffmpeg -y -hwaccel cuda -i ${videoTmpPath} -preset slow -g 48 -sc_threshold 0 -map 0:v:0 -map 0:a:0 -map 0:v:0 -map 0:a:0 -s:v:0 1280x720 -b:v:0 850k -s:v:1 630x360 -b:v:1 550k -c:v h264_nvenc -c:a aac -var_stream_map "v:0,a:0,name:720p v:1,a:1,name:360p" -master_pl_name master.m3u8 -hls_playlist 1 -f hls -hls_time 10 -hls_playlist_type vod -hls_list_size 0 -hls_segment_filename "${folderVideoPath}/segment_%v_%03d.ts" -f dash -min_seg_duration 2000 -use_template 1 -use_timeline 1 -seg_duration 10 -init_seg_name "${folderVideoPath}/init_$RepresentationID$.mp4" -media_seg_name "${folderVideoPath}/chunk_$RepresentationID$_$Number%05d$.mp4" -adaptation_sets "id=0,streams=v id=1,streams=a" -f dash manifest.mpd`;
-
-      exec(com, { maxBuffer: 1024 * 1024 * 1024 * 5 }, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`Ошибка выполнения команды: ${error}`);
-          reject(error);
-          return;
-        }
-        console.log(`stdout: ${stdout}`);
-        console.error(`stderr: ${stderr}`);
-        resolve(stdout);
-      });
-    });
-  }
-
   async toHlsUsingVideoCard(videoTmpPath: string, episodeName: string, resolutions: string[]) {
     //mp4 segments
     return new Promise((resolve, reject) => {
@@ -154,46 +112,68 @@ export class FfmpegService {
     });
   }
 
-  async toHls(videoTmpPath: string, episodeName: string, resolutions: string[]) {
+  async extractThumbnails(
+    videoTmpPath: string,
+    videoDuration: number,
+    thumbQuantity: number,
+    episodeName: string,
+  ) {
     return new Promise((resolve, reject) => {
-      const bandWidths = {
-        240: 200,
-        360: 400,
-        480: 550,
-        720: 1500,
-        1080: 3000,
-        1440: 6000,
-        2160: 12000,
-        4320: 25000,
-      };
+      function secondsToHms(seconds: number): string {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
 
-      let mapsCommand = '';
-      let resBtCommand = '';
-      let varStreamMapCommand = '';
-      for (let i = 0; i < resolutions.length; i++) {
-        mapsCommand += '-map 0:0 -map 0:1 ';
+        const formattedHours = String(hours).padStart(2, '0');
+        const formattedMinutes = String(minutes).padStart(2, '0');
+        const formattedSeconds = String(secs).padStart(2, '0');
 
-        const res = resolutions[i].replace('x', '*');
-        const height = Number(res.split('*')[1]);
-        resBtCommand += `-s:v:${i} ${res} -b:v:${i} ${bandWidths[height]}k `;
-
-        varStreamMapCommand += `v:${i},a:${i},name:${height}p `;
+        return `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
       }
 
-      const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'video', episodeName);
+      const folderThumbnailsPath = path.join(
+        __dirname,
+        '..',
+        '..',
+        'static',
+        'thumbnails',
+        episodeName,
+      );
 
-      const command = `ffmpeg -y -i ${videoTmpPath} -preset slow -g 48 -sc_threshold 0 ${mapsCommand}${resBtCommand}-c:a aac -var_stream_map "${varStreamMapCommand.trim()}" -master_pl_name master.m3u8 -f hls -hls_time 10 -hls_playlist_type vod -hls_list_size 0 -hls_segment_filename "${folderVideoPath}/%v/segmentNo%d.ts" ${folderVideoPath}/%v/index.m3u8`;
+      const thumbnailPromises = [];
 
-      exec(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`Ошибка выполнения команды: ${error}`);
-          reject(error);
-          return;
-        }
-        console.log(`stdout: ${stdout}`);
-        console.error(`stderr: ${stderr}`);
-        resolve(stdout);
-      });
+      for (let i = 1; i <= thumbQuantity; i++) {
+        const step = Math.floor(videoDuration / (thumbQuantity + 1));
+        console.log(secondsToHms(step * i));
+
+        const command = `ffmpeg -ss ${secondsToHms(step * i)} -i ${videoTmpPath} -frames:v 1 -vf "scale=360:-1" ${folderThumbnailsPath}/thumbnail_${i}.webp`;
+
+        thumbnailPromises.push(execPromise(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }));
+
+        // exec(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }, (error, stdout, stderr) => {
+        //   if (error) {
+        //     console.error(`Ошибка выполнения команды: ${error}`);
+        //     reject(error);
+        //     return;
+        //   }
+        //   console.log(`stdout: ${stdout}`);
+        //   console.error(`stderr: ${stderr}`);
+        //   resolve(stdout);
+        // });
+      }
+
+      const funcPromises = async () => {
+        await Promise.all(thumbnailPromises);
+        console.log('Thumbnails created successfully');
+        resolve('ok');
+      };
+
+      try {
+        funcPromises();
+      } catch (error) {
+        console.error(`Error creating thumbnails: ${error}`);
+        reject(error);
+      }
     });
   }
 }

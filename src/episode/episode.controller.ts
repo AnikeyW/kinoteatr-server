@@ -18,6 +18,7 @@ import * as path from 'path';
 import * as mime from 'mime-types';
 import * as uuid from 'uuid';
 import * as fs from 'fs';
+import { EditEpisodeDto } from './dto/edit-episode.dto';
 
 const storage = diskStorage({
   destination: function (req, file, cb) {
@@ -28,8 +29,14 @@ const storage = diskStorage({
     cb(null, tmpFolderPath);
   },
   filename: function (req, file, cb) {
+    if (path.extname(file.originalname).toLowerCase() === '.vtt') {
+      file.mimetype = 'text/vtt';
+    }
     const fileExtension = mime.extension(file.mimetype);
-    const fileName = uuid.v4() + '.' + fileExtension;
+    let fileName = uuid.v4() + '.' + fileExtension;
+    if (path.extname(file.originalname).toLowerCase() === '.vtt') {
+      fileName = file.originalname;
+    }
     cb(null, fileName);
   },
 });
@@ -43,20 +50,26 @@ export class EpisodeController {
     FileFieldsInterceptor(
       [
         { name: 'video', maxCount: 1 },
-        { name: 'poster', maxCount: 1 },
+        { name: 'subtitles', maxCount: 15 },
       ],
       { storage: storage },
     ),
   )
   createEpisode(@UploadedFiles() files, @Body() dto: CreateEpisodeDto) {
-    const { video, poster } = files;
+    const { video, subtitles } = files;
     if (!video) {
       throw new HttpException('Не загружено видео', HttpStatus.BAD_REQUEST);
     }
-    if (!poster) {
-      throw new HttpException('Не загружен постер', HttpStatus.BAD_REQUEST);
-    }
-    return this.episodeService.createEpisode(video[0].path, poster[0].path, dto);
+    return this.episodeService.createEpisode(video[0].path, subtitles, dto);
+  }
+
+  @Post(':id')
+  @UseInterceptors(
+    FileFieldsInterceptor([{ name: 'newSubtitles', maxCount: 15 }], { storage: storage }),
+  )
+  editEpisode(@UploadedFiles() files, @Param('id') episodeId, @Body() dto: EditEpisodeDto) {
+    const { newSubtitles } = files;
+    return this.episodeService.editEpisode(dto, Number(episodeId), newSubtitles);
   }
 
   @Get(':order')
