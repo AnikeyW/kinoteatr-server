@@ -166,7 +166,8 @@ export class EpisodeService {
       throw new HttpException('Эпизод с таким Id не найден', HttpStatus.NOT_FOUND);
     }
 
-    const episodeName = existEpisode.thumbnails[0].replace(/\\/g, '/').split('/')[1];
+    // const episodeName = existEpisode.thumbnails[0].replace(/\\/g, '/').split('/')[1];
+    const episodeName = existEpisode.poster.replace(/\\/g, '/').split('/')[1].split('.')[0];
 
     const existSubs: IExistSubtitles[] = JSON.parse(dto.existSubtitles);
 
