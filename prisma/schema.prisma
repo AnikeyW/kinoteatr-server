@@ -31,7 +31,7 @@ model Episode {
   id           Int         @id @default(autoincrement())
   title        String
   description  String
-  order        Int         @unique
+  order        Int
   skipRepeat   Int?        @map("skip_repeat")
   skipIntro    Int?        @map("skip_intro")
   skipCredits  Int?        @map("skip_credits")
