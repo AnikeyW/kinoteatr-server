@@ -72,7 +72,7 @@ export class EpisodeService {
           poster: thumbnails[10],
           thumbnails: thumbnails,
           isProcessing: true,
-          releaseDate: new Date(Number(dto.releaseDate)),
+          releaseDate: new Date(dto.releaseDate),
         },
       });
 
