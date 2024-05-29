@@ -259,7 +259,7 @@ export class EpisodeService {
       throw new HttpException('Сезон с таким порядковым номером не найден', HttpStatus.NOT_FOUND);
     }
 
-    const episode = await this.prismaService.episode.findUnique({
+    const episode = await this.prismaService.episode.findFirst({
       where: {
         seasonId: season.id,
         order: episodeOrder,
