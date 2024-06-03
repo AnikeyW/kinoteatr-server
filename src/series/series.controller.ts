@@ -8,13 +8,12 @@ import {
   Post,
   Query,
   UploadedFile,
-  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { SeriesService } from './series.service';
 import { CreateSeriesDto } from './dto/create-series.dto';
-import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { EditSeriesDto } from './dto/edit-series.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 

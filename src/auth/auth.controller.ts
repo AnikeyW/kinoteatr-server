@@ -1,5 +1,4 @@
 import {
-  Body,
   Controller,
   Post,
   UseGuards,
@@ -8,21 +7,19 @@ import {
   HttpException,
   HttpStatus,
   Res,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { CreateAdminDto } from './dto/create-admin.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('registration')
-  registration(@Body() dto: CreateAdminDto) {
-    return this.authService.registration(dto);
-  }
+  // @Post('registration')
+  // registration(@Body() dto: CreateAdminDto) {
+  //   return this.authService.registration(dto);
+  // }
 
   @UseGuards(LocalAuthGuard)
   @Post('login')
@@ -35,27 +32,11 @@ export class AuthController {
       // secure: true,
     });
     await res.cookie('accessToken', userData.accessToken, {
-      maxAge: 12 * 60 * 60 * 1000,
+      maxAge: 15 * 60 * 1000,
+      httpOnly: true,
     });
-    const { refreshToken, ...result } = userData;
-    return res.json(result);
-  }
-
-  // @UseGuards(JwtAuthGuard)
-  @Get('checkauth')
-  async checkAuth(@Req() req, @Res() res) {
-    const { accesstoken } = req.headers;
-    const { refreshtoken } = req.headers;
-
-    const tokenData = await this.authService.findOneRefreshToken(refreshtoken);
-    const validateRefresh = this.authService.validateRefreshToken(tokenData?.refreshToken);
-    const validateAccess = this.authService.validateRefreshToken(accesstoken);
-    if (!validateRefresh || !validateAccess) {
-      res.clearCookie('refreshToken');
-      res.clearCookie('accessToken');
-      return res.status(401).json({ message: 'не валидны токены', statusCode: 401 });
-    }
-    return res.json('ok');
+    const { admin } = userData;
+    return res.json(admin);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -92,8 +73,9 @@ export class AuthController {
       // secure: true,
     });
     await res.cookie('accessToken', userData.accessToken, {
-      maxAge: 12 * 60 * 60 * 1000,
+      maxAge: 15 * 60 * 1000,
+      httpOnly: true,
     });
-    return res.json({ admin: userData.admin, accessToken: userData.accessToken });
+    return res.json({ admin: userData.admin });
   }
 }

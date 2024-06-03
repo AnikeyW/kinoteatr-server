@@ -15,7 +15,7 @@ export class AuthService {
     const candidate = await this.findAdminByEmail(dto.email);
 
     if (candidate) {
-      throw new HttpException('неа', HttpStatus.BAD_REQUEST);
+      throw new HttpException('Емэил занят', HttpStatus.BAD_REQUEST);
     }
 
     const hashPassword = bcrypt.hashSync(dto.password, 10);
@@ -39,12 +39,8 @@ export class AuthService {
   }
 
   async logout(refreshToken: string) {
-    const userData = this.validateRefreshToken(refreshToken);
-    if (!userData) {
-      throw new UnauthorizedException();
-    }
     const token = await this.prismaService.token.delete({
-      where: { adminId: userData.id },
+      where: { refreshToken },
     });
 
     return 'ok';
@@ -55,14 +51,17 @@ export class AuthService {
       throw new UnauthorizedException();
     }
     const userData = this.validateRefreshToken(refreshToken);
-    const tokenFromDb = await this.findOneRefreshToken(refreshToken);
-    if (!userData || !tokenFromDb) {
-      await this.prismaService.token.delete({
-        where: {
-          adminId: userData.id,
-        },
-      });
-      throw new UnauthorizedException();
+    if (!userData) {
+      try {
+        await this.prismaService.token.delete({
+          where: {
+            adminId: userData.id,
+          },
+        });
+        throw new UnauthorizedException();
+      } catch (e) {
+        console.log('refresh, delete token from db', e);
+      }
     }
 
     const admin = await this.findAdminByEmail(userData.email);
@@ -143,7 +142,7 @@ export class AuthService {
     }
   }
 
-  async findOneRefreshToken(refreshToken: string): Promise<Token> {
-    return this.prismaService.token.findFirst({ where: { refreshToken: refreshToken } });
-  }
+  // async findOneRefreshToken(refreshToken: string): Promise<Token> {
+  //   return this.prismaService.token.findFirst({ where: { refreshToken: refreshToken } });
+  // }
 }

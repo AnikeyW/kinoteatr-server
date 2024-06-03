@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -19,6 +20,7 @@ import * as mime from 'mime-types';
 import * as uuid from 'uuid';
 import * as fs from 'fs';
 import { EditEpisodeDto } from './dto/edit-episode.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 const storage = diskStorage({
   destination: function (req, file, cb) {
@@ -45,6 +47,7 @@ const storage = diskStorage({
 export class EpisodeController {
   constructor(private episodeService: EpisodeService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post()
   @UseInterceptors(
     FileFieldsInterceptor(
@@ -63,6 +66,7 @@ export class EpisodeController {
     return this.episodeService.createEpisode(video[0].path, subtitles, dto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':id')
   @UseInterceptors(
     FileFieldsInterceptor([{ name: 'newSubtitles', maxCount: 15 }], { storage: storage }),
