@@ -147,7 +147,8 @@ export class EpisodeService {
           // todo: мб удалить эпизод из бд и удалить постер из статики и прекратить работу ffmpeg
         })
         .finally(() => {
-          fsExtra.remove(path.join(__dirname, '..', '..', '/tmp'));
+          // fsExtra.remove(path.join(__dirname, '..', '..', '/tmp'));
+          this.deleteTemporaryFiles([videoTmpPath]);
         });
 
       return { ...episode };
@@ -284,5 +285,15 @@ export class EpisodeService {
   private async createThumbnailsFolder(episodeName: string) {
     const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'thumbnails', episodeName);
     await mkdirAsync(folderVideoPath, { recursive: true });
+  }
+
+  private async deleteTemporaryFiles(filesToDelete: string[]): Promise<void> {
+    try {
+      for (const filePath of filesToDelete) {
+        await fsExtra.remove(filePath);
+      }
+    } catch (error) {
+      console.error(`Ошибка при удалении временных файлов: ${error}`);
+    }
   }
 }
