@@ -146,20 +146,9 @@ export class FfmpegService {
         const step = Math.floor(videoDuration / (thumbQuantity + 1));
         console.log(secondsToHms(step * i));
 
-        const command = `ffmpeg -ss ${secondsToHms(step * i)} -i ${videoTmpPath} -frames:v 1 -vf "scale=360:-1" ${folderThumbnailsPath}/thumbnail_${i}.webp`;
+        const command = `ffmpeg -ss ${secondsToHms(step * i)} -i ${videoTmpPath} -frames:v 1 -vf "scale=1080:-1" ${folderThumbnailsPath}/thumbnail_${i}.webp`;
 
         thumbnailPromises.push(execPromise(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }));
-
-        // exec(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }, (error, stdout, stderr) => {
-        //   if (error) {
-        //     console.error(`Ошибка выполнения команды: ${error}`);
-        //     reject(error);
-        //     return;
-        //   }
-        //   console.log(`stdout: ${stdout}`);
-        //   console.error(`stderr: ${stderr}`);
-        //   resolve(stdout);
-        // });
       }
 
       const funcPromises = async () => {
