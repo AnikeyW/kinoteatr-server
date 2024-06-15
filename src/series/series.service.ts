@@ -15,11 +15,9 @@ export class SeriesService {
   async createSeries(poster: File, dto: CreateSeriesDto): Promise<Series> {
     const posterPath = await this.fileService.createFile(FileTypes.IMAGE, poster);
 
-    const series = await this.prismaService.series.create({
+    return this.prismaService.series.create({
       data: { ...dto, poster: posterPath, releaseYear: Number(dto.releaseYear) },
     });
-
-    return series;
   }
 
   async editSeriesById(dto: EditSeriesDto, poster: File | null, seriesId: number): Promise<Series> {
@@ -35,7 +33,7 @@ export class SeriesService {
     } else {
       const series = await this.prismaService.series.findUnique({ where: { id: seriesId } });
       try {
-        await this.fileService.removeFile(series.poster);
+        this.fileService.removeFile(series.poster);
       } catch (e) {
         console.log('при удалении постера что то пошло не так', e);
       }
