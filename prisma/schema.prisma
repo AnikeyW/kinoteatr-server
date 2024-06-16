@@ -8,12 +8,17 @@ datasource db {
 }
 
 model Series {
-  id          Int      @id @default(autoincrement())
-  title       String
-  description String
-  releaseYear Int      @map("release_year")
-  poster      String
-  seasons     Season[] @relation("SeriesToSeason")
+  id            Int         @id @default(autoincrement())
+  title         String
+  description   String
+  releaseYear   Int         @map("release_year")
+  poster        String
+  rateKinopoisk Float       @default(9.0) @map("rate_kinopoisk")
+  rateImdb      Float       @default(9.0) @map("rate_imdb")
+  quality       Int         @default(1080)
+  countries     Countries[] @relation("SeriesToCountry")
+  seasons       Season[]    @relation("SeriesToSeason")
+  genres        Genre[]     @relation("SeriesToGenre")
 }
 
 model Season {
@@ -65,4 +70,16 @@ model Subtitles {
   src       String
   Episode   Episode? @relation("EpisodeToSubtitles", fields: [episodeId], references: [id])
   episodeId Int?     @map("episode_id")
+}
+
+model Countries {
+  id     Int      @id @default(autoincrement())
+  name   String   @unique
+  series Series[] @relation("SeriesToCountry")
+}
+
+model Genre {
+  id     Int      @id @default(autoincrement())
+  name   String   @unique
+  series Series[] @relation("SeriesToGenre")
 }

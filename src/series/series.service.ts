@@ -15,19 +15,76 @@ export class SeriesService {
   async createSeries(poster: File, dto: CreateSeriesDto): Promise<Series> {
     const posterPath = await this.fileService.createFile(FileTypes.IMAGE, poster);
 
+    const countriesList = JSON.parse(dto.countries).map((country) => ({ name: country }));
+
+    const genresList = JSON.parse(dto.genres).map((genre) => ({ name: genre }));
+
+    const { countries, genres, ...dtoResult } = dto;
+
     return this.prismaService.series.create({
-      data: { ...dto, poster: posterPath, releaseYear: Number(dto.releaseYear) },
+      data: {
+        ...dtoResult,
+        poster: posterPath,
+        releaseYear: Number(dtoResult.releaseYear),
+        rateKinopoisk: Number(dtoResult.rateKinopoisk),
+        rateImdb: Number(dtoResult.rateImdb),
+        quality: Number(dtoResult.quality),
+        countries: {
+          connect: countriesList,
+        },
+        genres: {
+          connect: genresList,
+        },
+      },
     });
   }
 
   async editSeriesById(dto: EditSeriesDto, poster: File | null, seriesId: number): Promise<Series> {
+    const existingSeries = await this.prismaService.series.findUnique({
+      where: { id: seriesId },
+      include: { countries: true, genres: true },
+    });
+
+    const newCountriesList = JSON.parse(dto.countries);
+    const newGenresList = JSON.parse(dto.genres);
+
+    const existingCountries = existingSeries.countries.map((country) => country.name);
+    const existingGenres = existingSeries.genres.map((genre) => genre.name);
+
+    const countriesToConnect = newCountriesList
+      .filter((country) => !existingCountries.includes(country))
+      .map((country) => ({ name: country }));
+    const genresToConnect = newGenresList
+      .filter((genre) => !existingGenres.includes(genre))
+      .map((genre) => ({ name: genre }));
+
+    const countriesToDisconnect = existingCountries
+      .filter((country) => !newCountriesList.includes(country))
+      .map((country) => ({ name: country }));
+    const genresToDisconnect = existingGenres
+      .filter((genre) => !newGenresList.includes(genre))
+      .map((genre) => ({ name: genre }));
+
+    const { countries, genres, ...dtoResult } = dto;
+
     if (!poster) {
       return this.prismaService.series.update({
         where: { id: seriesId },
         data: {
-          title: dto.title,
-          description: dto.description,
-          releaseYear: Number(dto.releaseYear),
+          title: dtoResult.title,
+          description: dtoResult.description,
+          releaseYear: Number(dtoResult.releaseYear),
+          rateKinopoisk: Number(dtoResult.rateKinopoisk),
+          rateImdb: Number(dtoResult.rateImdb),
+          quality: Number(dtoResult.quality),
+          countries: {
+            connect: countriesToConnect,
+            disconnect: countriesToDisconnect,
+          },
+          genres: {
+            connect: genresToConnect,
+            disconnect: genresToDisconnect,
+          },
         },
       });
     } else {
@@ -40,21 +97,51 @@ export class SeriesService {
       const posterPath = await this.fileService.createFile(FileTypes.IMAGE, poster);
       return this.prismaService.series.update({
         where: { id: seriesId },
-        data: { ...dto, poster: posterPath, releaseYear: Number(dto.releaseYear) },
+        data: {
+          ...dtoResult,
+          poster: posterPath,
+          releaseYear: Number(dtoResult.releaseYear),
+          rateKinopoisk: Number(dtoResult.rateKinopoisk),
+          rateImdb: Number(dtoResult.rateImdb),
+          quality: Number(dtoResult.quality),
+          countries: {
+            connect: countriesToConnect,
+            disconnect: countriesToDisconnect,
+          },
+          genres: {
+            connect: genresToConnect,
+            disconnect: genresToDisconnect,
+          },
+        },
       });
     }
   }
 
-  async getById(seriesId: number): Promise<Series> {
-    return this.prismaService.series.findUnique({
+  async getById(seriesId: number): Promise<any> {
+    const series = await this.prismaService.series.findUnique({
       where: { id: seriesId },
       include: {
         seasons: {
           where: { seriesId },
           orderBy: { order: 'asc' },
         },
+        genres: true,
+        countries: true,
       },
     });
+
+    if (!series) {
+      throw new Error('Series not found');
+    }
+
+    const countries = series.countries.map((c) => c.name);
+    const genres = series.genres.map((g) => g.name);
+
+    return {
+      ...series,
+      countries,
+      genres,
+    };
   }
 
   async getManySeries(skip: number, take: number): Promise<Series[]> {
