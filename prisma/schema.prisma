@@ -25,7 +25,7 @@ model Season {
   id          Int       @id @default(autoincrement())
   title       String
   description String
-  order       Int       @unique
+  order       Int
   poster      String
   series      Series    @relation("SeriesToSeason", fields: [seriesId], references: [id])
   seriesId    Int       @map("series_id")

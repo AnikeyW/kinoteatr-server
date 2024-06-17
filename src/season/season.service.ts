@@ -13,6 +13,7 @@ export class SeasonService {
   ) {}
 
   async createSeason(dto: CreateSeasonDto, poster: File): Promise<Season> {
+    console.log(dto);
     const isExistOrderNumber = await this.prismaService.season.findFirst({
       where: { order: Number(dto.order), seriesId: Number(dto.seriesId) },
     });
@@ -84,7 +85,7 @@ export class SeasonService {
   }
 
   async getByOrder(seriesId: number, order: number): Promise<Season> {
-    const season = await this.prismaService.season.findUnique({
+    const season = await this.prismaService.season.findFirst({
       where: { seriesId: seriesId, order: order },
     });
 

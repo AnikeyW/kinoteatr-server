@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpException,
   HttpStatus,
@@ -63,7 +64,7 @@ export class EpisodeController {
     if (!video) {
       throw new HttpException('Не загружено видео', HttpStatus.BAD_REQUEST);
     }
-    return this.episodeService.createEpisode(video[0].path, subtitles, dto);
+    return this.episodeService.createEpisode(video[0].path, subtitles ? subtitles : [], dto);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -74,6 +75,12 @@ export class EpisodeController {
   editEpisode(@UploadedFiles() files, @Param('id') episodeId, @Body() dto: EditEpisodeDto) {
     const { newSubtitles } = files;
     return this.episodeService.editEpisode(dto, Number(episodeId), newSubtitles);
+  }
+
+  // @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  deleteEpisode(@Param('id') episodeId) {
+    return this.episodeService.deleteEpisode(+episodeId);
   }
 
   @Get(':order')

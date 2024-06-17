@@ -141,14 +141,14 @@ export class EpisodeService {
             },
           });
         })
+        .then(() => {
+          this.deleteTemporaryFiles([videoTmpPath]);
+        })
         .catch((error) => {
           console.error(`Ошибка при выполнении команды: ${error}`);
+          this.deleteTemporaryFiles([videoTmpPath]);
           throw new HttpException(error, HttpStatus.INTERNAL_SERVER_ERROR);
           // todo: мб удалить эпизод из бд и удалить постер из статики и прекратить работу ffmpeg
-        })
-        .finally(() => {
-          // fsExtra.remove(path.join(__dirname, '..', '..', '/tmp'));
-          this.deleteTemporaryFiles([videoTmpPath]);
         });
 
       return { ...episode };
@@ -252,7 +252,7 @@ export class EpisodeService {
     seriesId: number,
     episodeOrder: number,
   ): Promise<Episode & { subtitles: Subtitles[] }> {
-    const season = await this.prismaService.season.findUnique({
+    const season = await this.prismaService.season.findFirst({
       where: { seriesId: seriesId, order: seasonOrder },
     });
 
@@ -275,6 +275,47 @@ export class EpisodeService {
     }
 
     return episode;
+  }
+
+  async deleteEpisode(episodeId: number) {
+    try {
+      const episode = await this.getById(episodeId);
+      if (!episode) {
+        throw new HttpException('Эпизод не найден', HttpStatus.NOT_FOUND);
+      }
+
+      const episodeName = episode.poster.replace(/\\/g, '/').split('/')[1].split('.')[0];
+
+      const staticPath = path.join(__dirname, '..', '..', 'static');
+      console.log(staticPath);
+
+      // Удалить thumbnails
+      const thumbnailsDir = path.join(staticPath, 'thumbnails', episodeName);
+      if (fs.existsSync(thumbnailsDir)) {
+        await fsExtra.remove(thumbnailsDir);
+        console.log(`Deleted thumbnails directory: ${thumbnailsDir}`);
+      }
+
+      // Удалить папку с видео
+      const videoDir = path.join(staticPath, 'videos', episodeName);
+      if (fs.existsSync(videoDir)) {
+        await fsExtra.remove(videoDir);
+        console.log(`Deleted video directory: ${videoDir}`);
+      }
+
+      // Удалить субтитры, если есть
+      const subtitlesDir = path.join(staticPath, 'subtitles', episodeName);
+      if (fs.existsSync(subtitlesDir)) {
+        await fsExtra.remove(subtitlesDir);
+        console.log(`Deleted subtitles directory: ${subtitlesDir}`);
+      }
+
+      // Удалить эпизод из БД
+      await this.prismaService.episode.delete({ where: { id: episodeId } });
+      return episode;
+    } catch (e) {
+      throw new HttpException('Ошибка удаления', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   private async createEpisodeFolder(episodeName: string) {
