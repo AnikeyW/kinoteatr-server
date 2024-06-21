@@ -113,10 +113,43 @@ export class EpisodeService {
       ];
 
       const uploadedVideoResolution = await this.ffmpegService.getVideoResolution(videoTmpPath);
+      //
+      // const aspectRatio = (uploadedVideoResolution.width / uploadedVideoResolution.height).toFixed(
+      //   2,
+      // );
+      //
+      // const resolutions_16_9 = [
+      //   '426x240', // 240p
+      //   '640x360', // 360p
+      //   '854x480', // 480p
+      //   '1280x720', // 720p
+      //   '1920x1080', // 1080p
+      //   '2560x1440', // 1440p (2K)
+      //   '3840x2160', // 2160p (4K)
+      //   '7680x4320', // 4320p (8K)
+      // ];
+      //
+      // const resolutions_2_1 = [
+      //   '320x240',
+      //   '640x360',
+      //   '854x480',
+      //   '1280x640',
+      //   '1920x960',
+      //   '2560x1440',
+      //   '3840x2160',
+      //   '7680x4320',
+      // ];
+      //
+      // const resolutionsByAspectRatio = {
+      //   1.78: resolutions_16_9,
+      //   1.77: resolutions_16_9,
+      // };
 
-      const resolutions = resolutionsList.filter(
-        (r) => Number(r.split('x')[1]) <= uploadedVideoResolution.height,
-      );
+      // const resolutions = resolutionsList.filter(
+      //   (r) => Number(r.split('x')[1]) <= uploadedVideoResolution.height,
+      // );
+
+      const resolutions = ['320x240', '640x360', '854x480', '1280x720', '1920x1080'];
 
       const hlsPath = path.join('video', episodeName, 'master.m3u8');
       const dashPath = path.join('video', episodeName, 'master.mpd');
@@ -297,7 +330,7 @@ export class EpisodeService {
       }
 
       // Удалить папку с видео
-      const videoDir = path.join(staticPath, 'videos', episodeName);
+      const videoDir = path.join(staticPath, 'video', episodeName);
       if (fs.existsSync(videoDir)) {
         await fsExtra.remove(videoDir);
         console.log(`Deleted video directory: ${videoDir}`);

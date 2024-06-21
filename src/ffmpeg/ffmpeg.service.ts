@@ -147,6 +147,8 @@ export class FfmpegService {
         console.log(secondsToHms(step * i));
 
         const command = `ffmpeg -ss ${secondsToHms(step * i)} -i ${videoTmpPath} -frames:v 1 -vf "scale=1080:-1" ${folderThumbnailsPath}/thumbnail_${i}.webp`;
+        // const command = `ffmpeg -ss ${secondsToHms(step * i)} -i ${videoTmpPath} -frames:v 1 -vf "scale='if(gt(a,16/9),1080,-1)':'if(gt(a,16/9),-1,1080)',pad=1080:1080:(ow-iw)/2:(oh-ih)/2" ${folderThumbnailsPath}/thumbnail_${i}.webp`;
+        // const command = `ffmpeg -ss ${secondsToHms(step * i)} -i ${videoTmpPath} -frames:v 1 -vf "scale='if(gte(iw/ih,16/9),1080,-1)':'if(gte(iw/ih,16/9),-1,1080)',pad=1080:1080:(1080-iw)/2:(1080-ih)/2" ${folderThumbnailsPath}/thumbnail_${i}.webp`;
 
         thumbnailPromises.push(execPromise(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }));
       }
