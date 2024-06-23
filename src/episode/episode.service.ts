@@ -11,6 +11,7 @@ import { FfmpegService } from '../ffmpeg/ffmpeg.service';
 import { FileService } from '../file/file.service';
 import { Mp4boxService } from '../mp4box/mp4box.service';
 import { EditEpisodeDto, IExistSubtitles } from './dto/edit-episode.dto';
+import { SubtitlesService } from '../subtitles/subtitles.service';
 
 const mkdirAsync = promisify(fs.mkdir);
 
@@ -21,13 +22,14 @@ export class EpisodeService {
     private ffmpegService: FfmpegService,
     private mp4boxService: Mp4boxService,
     private fileService: FileService,
+    private subtitlesService: SubtitlesService,
   ) {}
 
   async createEpisode(
     videoTmpPath: string,
-    subtitlesTmpList: { path: string }[],
+    // subtitlesTmpList: { path: string }[],
     dto: CreateEpisodeDto,
-  ): Promise<Episode> {
+  ) {
     const isExistOrderNumber = await this.prismaService.episode.findFirst({
       where: { order: Number(dto.order), seasonId: Number(dto.seasonId) },
     });
@@ -37,25 +39,19 @@ export class EpisodeService {
         HttpStatus.BAD_REQUEST,
       );
     }
+    // console.log(dto);
+    // return;
 
     try {
       const episodeName = uuid.v4();
-      const THUMB_QUANTITY = 20;
 
       const videoDuration = await this.ffmpegService.getVideoDuration(videoTmpPath);
 
-      await this.createThumbnailsFolder(episodeName);
-      await this.ffmpegService.extractThumbnails(
+      const thumbnailsPaths = await this.ffmpegService.extractThumbnails(
         videoTmpPath,
         videoDuration,
-        THUMB_QUANTITY,
         episodeName,
       );
-
-      const thumbnails = [];
-      for (let i = 1; i <= THUMB_QUANTITY; i++) {
-        thumbnails.push(path.join('thumbnails', episodeName, `thumbnail_${i}.webp`));
-      }
 
       const episode = await this.prismaService.episode.create({
         data: {
@@ -69,87 +65,54 @@ export class EpisodeService {
           duration: videoDuration,
           srcHls: '',
           srcDash: '',
-          poster: thumbnails[10],
-          thumbnails: thumbnails,
+          poster: thumbnailsPaths[10],
+          thumbnails: thumbnailsPaths,
           isProcessing: true,
           releaseDate: new Date(dto.releaseDate),
         },
       });
 
-      if (subtitlesTmpList.length > 0) {
-        const subtitlesStaticPath = path.join(
-          __dirname,
-          '..',
-          '..',
-          'static',
-          'subtitles',
-          episodeName,
-        );
+      const subtitlesList = await this.ffmpegService.extractSubtitles(videoTmpPath, episodeName);
 
-        const saveSubtitles = async (subtitlesTmpList) => {
-          for (const subtitleTmp of subtitlesTmpList) {
-            const subPath = this.fileService.moveFileToStatic(
-              subtitleTmp.path,
-              subtitlesStaticPath,
-            );
-            await this.prismaService.subtitles.create({
-              data: { src: subPath, episodeId: episode.id },
-            });
-          }
-        };
-
-        await saveSubtitles(subtitlesTmpList);
-      }
-
-      const resolutionsList = [
-        '320x240',
-        '640x360',
-        '854x480',
-        '1280x720',
-        '1920x1080',
-        '2560x1440',
-        '3840x2160',
-        '7680x4320',
-      ];
+      await this.subtitlesService.saveSubtitles(subtitlesList, episode.id, episodeName);
 
       const uploadedVideoResolution = await this.ffmpegService.getVideoResolution(videoTmpPath);
-      //
-      // const aspectRatio = (uploadedVideoResolution.width / uploadedVideoResolution.height).toFixed(
-      //   2,
-      // );
-      //
-      // const resolutions_16_9 = [
-      //   '426x240', // 240p
-      //   '640x360', // 360p
-      //   '854x480', // 480p
-      //   '1280x720', // 720p
-      //   '1920x1080', // 1080p
-      //   '2560x1440', // 1440p (2K)
-      //   '3840x2160', // 2160p (4K)
-      //   '7680x4320', // 4320p (8K)
-      // ];
-      //
-      // const resolutions_2_1 = [
-      //   '320x240',
-      //   '640x360',
-      //   '854x480',
-      //   '1280x640',
-      //   '1920x960',
-      //   '2560x1440',
-      //   '3840x2160',
-      //   '7680x4320',
-      // ];
-      //
-      // const resolutionsByAspectRatio = {
-      //   1.78: resolutions_16_9,
-      //   1.77: resolutions_16_9,
-      // };
 
-      // const resolutions = resolutionsList.filter(
-      //   (r) => Number(r.split('x')[1]) <= uploadedVideoResolution.height,
-      // );
+      const aspectRatio = (uploadedVideoResolution.width / uploadedVideoResolution.height).toFixed(
+        2,
+      );
 
-      const resolutions = ['320x240', '640x360', '854x480', '1280x720', '1920x1080'];
+      const resolutions_16_9 = [
+        '426x240', // 240p
+        '640x360', // 360p
+        '854x480', // 480p
+        '1280x720', // 720p
+        '1920x1080', // 1080p
+        '2560x1440', // 1440p (2K)
+        '3840x2160', // 2160p (4K)
+        '7680x4320', // 4320p (8K)
+      ];
+
+      const resolutions_2_1 = [
+        '426x213',
+        '640x320',
+        '854x427',
+        '1280x640',
+        '1920x960',
+        '2560x1280',
+        '3840x1920',
+        '7680x3840',
+      ];
+
+      const resolutionsByAspectRatio = {
+        '1.78': resolutions_16_9,
+        '1.77': resolutions_16_9,
+        '2.00': resolutions_2_1,
+      };
+
+      const resolutions = resolutionsByAspectRatio[aspectRatio].filter(
+        (r) => Number(r.split('x')[0]) <= uploadedVideoResolution.width,
+      );
 
       const hlsPath = path.join('video', episodeName, 'master.m3u8');
       const dashPath = path.join('video', episodeName, 'master.mpd');
@@ -200,7 +163,6 @@ export class EpisodeService {
       throw new HttpException('Эпизод с таким Id не найден', HttpStatus.NOT_FOUND);
     }
 
-    // const episodeName = existEpisode.thumbnails[0].replace(/\\/g, '/').split('/')[1];
     const episodeName = existEpisode.poster.replace(/\\/g, '/').split('/')[1].split('.')[0];
 
     const existSubs: IExistSubtitles[] = JSON.parse(dto.existSubtitles);
@@ -353,11 +315,6 @@ export class EpisodeService {
 
   private async createEpisodeFolder(episodeName: string) {
     const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'video', episodeName);
-    await mkdirAsync(folderVideoPath, { recursive: true });
-  }
-
-  private async createThumbnailsFolder(episodeName: string) {
-    const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'thumbnails', episodeName);
     await mkdirAsync(folderVideoPath, { recursive: true });
   }
 

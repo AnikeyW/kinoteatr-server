@@ -12,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtModule } from '@nestjs/jwt';
 import { Mp4boxModule } from './mp4box/mp4box.module';
 import { GuidesModule } from './guides/guides.module';
+import { SubtitlesModule } from './subtitles/subtitles.module';
 import * as process from 'process';
 
 @Module({
@@ -38,6 +39,7 @@ import * as process from 'process';
     AuthModule,
     Mp4boxModule,
     GuidesModule,
+    SubtitlesModule,
   ],
 })
 export class AppModule {}
