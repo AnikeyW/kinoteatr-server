@@ -25,11 +25,7 @@ export class EpisodeService {
     private subtitlesService: SubtitlesService,
   ) {}
 
-  async createEpisode(
-    videoTmpPath: string,
-    // subtitlesTmpList: { path: string }[],
-    dto: CreateEpisodeDto,
-  ) {
+  async createEpisode(videoTmpPath: string, dto: CreateEpisodeDto) {
     const isExistOrderNumber = await this.prismaService.episode.findFirst({
       where: { order: Number(dto.order), seasonId: Number(dto.seasonId) },
     });
@@ -39,8 +35,6 @@ export class EpisodeService {
         HttpStatus.BAD_REQUEST,
       );
     }
-    // console.log(dto);
-    // return;
 
     try {
       const episodeName = uuid.v4();
