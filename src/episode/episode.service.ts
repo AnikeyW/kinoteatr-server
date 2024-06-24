@@ -25,12 +25,11 @@ export class EpisodeService {
     private subtitlesService: SubtitlesService,
   ) {}
 
-  async createEpisode(videoTmpPath: string, dto: CreateEpisodeDto) {
   async createEpisode(
     videoTmpPath: string,
     subtitlesTmpList: { path: string }[],
     dto: CreateEpisodeDto,
-  ) {
+  ): Promise<Episode> {
     const isExistOrderNumber = await this.prismaService.episode.findFirst({
       where: { order: Number(dto.order), seasonId: Number(dto.seasonId) },
     });
@@ -71,9 +70,6 @@ export class EpisodeService {
         },
       });
 
-      // const subtitlesList = await this.ffmpegService.extractSubtitles(videoTmpPath, episodeName);
-
-      // await this.subtitlesService.saveSubtitles(subtitlesList, episode.id, episodeName);
       if (subtitlesTmpList.length > 0) {
         const subtitlesStaticPath = path.join(
           __dirname,

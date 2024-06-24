@@ -50,7 +50,15 @@ export class EpisodeController {
 
   // @UseGuards(JwtAuthGuard)
   @Post()
-  @UseInterceptors(FileFieldsInterceptor([{ name: 'video', maxCount: 1 }], { storage: storage }))
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'video', maxCount: 1 },
+        { name: 'subtitles', maxCount: 15 },
+      ],
+      { storage: storage },
+    ),
+  )
   createEpisode(@UploadedFiles() files, @Body() dto: CreateEpisodeDto) {
     const { video, subtitles } = files;
     if (!video) {
