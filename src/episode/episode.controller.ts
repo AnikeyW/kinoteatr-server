@@ -54,19 +54,17 @@ export class EpisodeController {
     FileFieldsInterceptor(
       [
         { name: 'video', maxCount: 1 },
-        // { name: 'subtitles', maxCount: 15 },
+        { name: 'subtitles', maxCount: 15 },
       ],
       { storage: storage },
     ),
   )
   createEpisode(@UploadedFiles() files, @Body() dto: CreateEpisodeDto) {
-    // const { video, subtitles } = files;
-    const { video } = files;
+    const { video, subtitles } = files;
     if (!video) {
       throw new HttpException('Не загружено видео', HttpStatus.BAD_REQUEST);
     }
-    // return this.episodeService.createEpisode(video[0].path, subtitles ? subtitles : [], dto);
-    return this.episodeService.createEpisode(video[0].path, dto);
+    return this.episodeService.createEpisode(video[0].path, subtitles ? subtitles : [], dto);
   }
 
   @UseGuards(JwtAuthGuard)
