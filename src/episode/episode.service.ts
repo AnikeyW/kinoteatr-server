@@ -26,6 +26,11 @@ export class EpisodeService {
   ) {}
 
   async createEpisode(videoTmpPath: string, dto: CreateEpisodeDto) {
+  async createEpisode(
+    videoTmpPath: string,
+    subtitlesTmpList: { path: string }[],
+    dto: CreateEpisodeDto,
+  ) {
     const isExistOrderNumber = await this.prismaService.episode.findFirst({
       where: { order: Number(dto.order), seasonId: Number(dto.seasonId) },
     });
@@ -66,9 +71,33 @@ export class EpisodeService {
         },
       });
 
-      const subtitlesList = await this.ffmpegService.extractSubtitles(videoTmpPath, episodeName);
+      // const subtitlesList = await this.ffmpegService.extractSubtitles(videoTmpPath, episodeName);
 
-      await this.subtitlesService.saveSubtitles(subtitlesList, episode.id, episodeName);
+      // await this.subtitlesService.saveSubtitles(subtitlesList, episode.id, episodeName);
+      if (subtitlesTmpList.length > 0) {
+        const subtitlesStaticPath = path.join(
+          __dirname,
+          '..',
+          '..',
+          'static',
+          'subtitles',
+          episodeName,
+        );
+
+        const saveSubtitles = async (subtitlesTmpList) => {
+          for (const subtitleTmp of subtitlesTmpList) {
+            const subPath = this.fileService.moveFileToStatic(
+              subtitleTmp.path,
+              subtitlesStaticPath,
+            );
+            await this.prismaService.subtitles.create({
+              data: { src: subPath, episodeId: episode.id },
+            });
+          }
+        };
+
+        await saveSubtitles(subtitlesTmpList);
+      }
 
       const uploadedVideoResolution = await this.ffmpegService.getVideoResolution(videoTmpPath);
 

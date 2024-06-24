@@ -52,11 +52,11 @@ export class EpisodeController {
   @Post()
   @UseInterceptors(FileFieldsInterceptor([{ name: 'video', maxCount: 1 }], { storage: storage }))
   createEpisode(@UploadedFiles() files, @Body() dto: CreateEpisodeDto) {
-    const { video } = files;
+    const { video, subtitles } = files;
     if (!video) {
       throw new HttpException('Не загружено видео', HttpStatus.BAD_REQUEST);
     }
-    return this.episodeService.createEpisode(video[0].path, dto);
+    return this.episodeService.createEpisode(video[0].path, subtitles ? subtitles : [], dto);
   }
 
   @UseGuards(JwtAuthGuard)
