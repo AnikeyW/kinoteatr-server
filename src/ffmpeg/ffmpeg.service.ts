@@ -7,6 +7,7 @@ import {
   ExtractedSubtitlesWithCreatedName,
   IExtractedSubtitles,
 } from '../subtitles/extractedSubtitlesType';
+import { IAudioInfoTrack } from './types';
 
 const execPromise = promisify(exec);
 const mkdirAsync = promisify(fs.mkdir);
@@ -75,539 +76,269 @@ export class FfmpegService {
     });
   }
 
-  async toHlsUsingVideoCard(videoTmpPath: string, episodeName: string, resolutions: string[]) {
-    //mp4 segments
-    return new Promise((resolve, reject) => {
-      const qualityNamesByWidth = {
-        426: '240p',
-        640: '360p',
-        854: '480p',
-        1280: '720p',
-        1920: '1080p',
-        2560: '1440p',
-        3840: '2160p',
-        7680: '4320p',
-      };
-      const bandWidthsByWidth = {
-        426: 200,
-        640: 400,
-        854: 550,
-        1280: 1500,
-        1920: 4000,
-        2560: 8000,
-        3840: 16000,
-        7680: 32000,
-      };
+  async toHlsUsingVideoCard(
+    videoTmpPath: string,
+    episodeName: string,
+    resolutions: string[],
+  ): Promise<{ resolutions: string[]; audioTracks: IAudioInfoTrack[] }> {
+    const qualityNamesByWidth = {
+      426: '240p',
+      640: '360p',
+      854: '480p',
+      1280: '720p',
+      1920: '1080p',
+      2560: '1440p',
+      3840: '2160p',
+      7680: '4320p',
+    };
 
-      let mapsCommand = '';
-      let resBtCommand = '';
-      let varStreamMapCommand = '';
-      for (let i = 0; i < resolutions.length; i++) {
-        mapsCommand += '-map 0:0 -map 0:1 ';
+    const bandWidthsByWidth = {
+      426: 200,
+      640: 400,
+      854: 550,
+      1280: 1500,
+      1920: 4000,
+      2560: 8000,
+      3840: 16000,
+      7680: 32000,
+    };
 
-        const res = resolutions[i].replace('x', '*');
-        const width = Number(res.split('*')[0]);
-        resBtCommand += `-s:v:${i} ${res} -b:v:${i} ${bandWidthsByWidth[width]}k `;
+    const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'video', episodeName);
 
-        varStreamMapCommand += `v:${i},a:${i},name:${qualityNamesByWidth[width]} `;
+    try {
+      await mkdirAsync(folderVideoPath, { recursive: true });
+
+      // Determine audio streams in the video file using mediainfo
+      const mediainfoOutput = await new Promise<string>((resolve, reject) => {
+        const mediainfo = spawn('mediainfo', ['--Output=JSON', videoTmpPath]);
+
+        let stdout = '';
+        let stderr = '';
+
+        mediainfo.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+
+        mediainfo.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        mediainfo.on('close', (code) => {
+          if (code === 0) {
+            resolve(stdout);
+          } else {
+            reject(new Error(`mediainfo exited with code ${code}: ${stderr}`));
+          }
+        });
+      });
+
+      const mediainfoJson = JSON.parse(mediainfoOutput);
+      console.log('mediainfoJson', mediainfoJson);
+      const videoTrack = mediainfoJson.media.track.find((track: any) => track['@type'] === 'Video');
+      console.log('videoTrack', videoTrack);
+
+      const audioTracksFull = mediainfoJson.media.track.filter(
+        (track: any) => track['@type'] === 'Audio',
+      );
+      console.log('audioTracksFull', audioTracksFull);
+      const audioTracks: IAudioInfoTrack[] = audioTracksFull.map((audio, index) => ({
+        index: index,
+        bitrate: audio.BitRate,
+        title: audio.Title,
+        language: audio.Language,
+        default: audio.Default,
+        format: audio.Format,
+        channels: audio.Channels,
+        channelPositions: audio.ChannelPositions,
+        codec: audio.CodecID,
+      }));
+
+      function formatBitrate(bitrateStr) {
+        if (bitrateStr.length > 3 && bitrateStr.endsWith('000')) {
+          return bitrateStr.slice(0, -3) + 'k';
+        }
+        return bitrateStr + 'k';
       }
 
-      const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'video', episodeName);
+      let videoMaps: string[] = [];
+      let audioMaps: string[] = [];
+      let varStreamMap = '';
+      for (let i = 0; i < resolutions.length; i++) {
+        const width = Number(resolutions[i].split('x')[0]);
+        const folderQaulityPath = path.join(folderVideoPath, qualityNamesByWidth[width]);
+        fs.mkdirSync(folderQaulityPath, { recursive: true });
+        videoMaps.push('-map');
+        videoMaps.push('0:v:0');
+        videoMaps.push(`-s:v:${i}`);
+        videoMaps.push(`${resolutions[i]}`);
+        videoMaps.push(`-b:v:${i}`);
+        videoMaps.push(`${bandWidthsByWidth[width]}k`);
+        varStreamMap += `v:${i},name:${qualityNamesByWidth[width]} `;
+      }
+      for (let i = 0; i < audioTracks.length; i++) {
+        const folderAudioPath = path.join(folderVideoPath, `audio_${i}`);
+        fs.mkdirSync(folderAudioPath, { recursive: true });
+        audioMaps.push('-map');
+        audioMaps.push(`0:a:${i}`);
+        audioMaps.push(`-c:a`);
+        audioMaps.push(`aac`);
+        audioMaps.push(`-ac`);
+        audioMaps.push(`2`);
+        // audioMaps.push(`${audioTracks[i].channels}`);
+        audioMaps.push(`-b:a`);
+        audioMaps.push(`${formatBitrate(audioTracks[i].bitrate)}`);
+        audioMaps.push(`-f`);
+        audioMaps.push(`hls`);
+        audioMaps.push(`-hls_time`);
+        audioMaps.push(`10`);
+        audioMaps.push(`-hls_list_size`);
+        audioMaps.push(`0`);
+        audioMaps.push(`-hls_segment_filename`);
+        audioMaps.push(`"${path.join(folderAudioPath, 'segmentNo%d.mp4')}"`);
+        audioMaps.push(`${path.join(folderAudioPath, 'index.m3u8')}`);
+      }
 
-      const command = `ffmpeg -y -hwaccel cuda -i ${videoTmpPath} -preset slow -g 48 -sc_threshold 0 ${mapsCommand}${resBtCommand}-c:v h264_nvenc -c:a aac -var_stream_map "${varStreamMapCommand.trim()}" -master_pl_name master.m3u8 -f hls -hls_time 10 -hls_playlist_type vod -hls_list_size 0 -hls_segment_filename "${folderVideoPath}/%v/segmentNo%d.mp4" ${folderVideoPath}/%v/index.m3u8`;
+      const hlsCommand = [
+        'ffmpeg',
+        '-y',
+        '-hwaccel',
+        'cuda',
+        '-i',
+        videoTmpPath,
+        '-preset',
+        'slow',
+        '-g',
+        '48',
+        '-sc_threshold',
+        '0',
+        ...videoMaps,
+        '-c:v',
+        'h264_nvenc',
+        '-var_stream_map',
+        `"${varStreamMap.trim()}"`,
+        '-f',
+        'hls',
+        '-hls_time',
+        '10',
+        '-hls_playlist_type',
+        'vod',
+        '-hls_list_size',
+        '0',
+        '-hls_segment_filename',
+        `"${path.join(folderVideoPath, '%v', 'segmentNo%d.mp4')}"`,
+        '-master_pl_name',
+        'master.m3u8',
+        `${path.join(folderVideoPath, '%v', 'index.m3u8')}`,
+        ...audioMaps,
+      ];
 
-      exec(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`Ошибка выполнения команды: ${error}`);
-          reject(error);
-          return;
-        }
-        console.log(`stdout: ${stdout}`);
-        console.error(`stderr: ${stderr}`);
-        resolve(stdout);
+      const command = hlsCommand.join(' ');
+
+      console.log('command', command);
+
+      const result = await new Promise<string>((resolve, reject) => {
+        exec(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Ошибка выполнения команды: ${error}`);
+            reject(error);
+            return;
+          }
+          console.log(`stdout: ${stdout}`);
+          console.error(`stderr: ${stderr}`);
+          resolve(stdout);
+        });
       });
-    });
+
+      console.log('HLS generation completed successfully');
+
+      this.editMasterManifest(resolutions, audioTracks, path.join(folderVideoPath, 'master.m3u8'));
+
+      // const masterManifest = this.createMasterManifest(
+      //   resolutions,
+      //   audioTracks,
+      //   qualityNamesByWidth,
+      //   folderVideoPath,
+      //   videoTrack,
+      // );
+      // console.log('masterManifest', masterManifest);
+      // fs.writeFileSync(path.join(folderVideoPath, 'master.m3u8'), masterManifest);
+
+      return { resolutions, audioTracks };
+    } catch (error) {
+      console.error(`Error in toHlsUsingVideoCard: ${error.message}`);
+      throw error;
+    }
   }
-  // async toHlsUsingVideoCard(videoTmpPath, episodeName, resolutions) {
-  //   return new Promise((resolve, reject) => {
-  //     const qualityNamesByWidth = {
-  //       426: '240p',
-  //       640: '360p',
-  //       854: '480p',
-  //       1280: '720p',
-  //       1920: '1080p',
-  //       2560: '1440p',
-  //       3840: '2160p',
-  //       7680: '4320p',
-  //     };
-  //     const bandWidthsByWidth = {
-  //       426: 200,
-  //       640: 400,
-  //       854: 550,
-  //       1280: 1500,
-  //       1920: 4000,
-  //       2560: 8000,
-  //       3840: 16000,
-  //       7680: 32000,
-  //     };
-  //
-  //     const ffprobe = spawn('ffprobe', [
-  //       '-v',
-  //       'error',
-  //       '-select_streams',
-  //       'a',
-  //       '-show_entries',
-  //       'stream=index',
-  //       '-of',
-  //       'json',
-  //       videoTmpPath,
-  //     ]);
-  //
-  //     let stdout = '';
-  //     let stderr = '';
-  //
-  //     ffprobe.stdout.on('data', (data) => {
-  //       stdout += data.toString();
-  //     });
-  //
-  //     ffprobe.stderr.on('data', (data) => {
-  //       stderr += data.toString();
-  //     });
-  //
-  //     ffprobe.on('close', (code) => {
-  //       if (code !== 0) {
-  //         reject(`ffprobe exited with code ${code}: ${stderr}`);
-  //         return;
-  //       }
-  //
-  //       try {
-  //         const ffprobeOutput = JSON.parse(stdout);
-  //         const audioTracks = ffprobeOutput.streams.length;
-  //         console.log('audioTracks', audioTracks);
-  //
-  //         let mapsCommand = '';
-  //         let resBtCommand = '';
-  //         let varStreamMapCommand = '';
-  //         for (let i = 0; i < resolutions.length; i++) {
-  //           mapsCommand += `-map 0:0 `;
-  //           for (let j = 0; j < audioTracks; j++) {
-  //             mapsCommand += `-map 0:a:${j} `;
-  //           }
-  //
-  //           const res = resolutions[i].replace('x', '*');
-  //           const width = Number(res.split('*')[0]);
-  //           resBtCommand += `-s:v:${i} ${res} -b:v:${i} ${bandWidthsByWidth[width]}k `;
-  //
-  //           varStreamMapCommand += `v:${i},name:${qualityNamesByWidth[width]} `;
-  //           for (let j = 0; j < audioTracks; j++) {
-  //             varStreamMapCommand += `a:${i * audioTracks + j},name:${qualityNamesByWidth[width]}_audio${j} `;
-  //           }
-  //         }
-  //
-  //         const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'video', episodeName);
-  //
-  //         const command = `ffmpeg -y -hwaccel cuda -i ${videoTmpPath} -preset slow -g 48 -sc_threshold 0 ${mapsCommand}${resBtCommand}-c:v h264_nvenc -c:a aac -var_stream_map "${varStreamMapCommand.trim()}" -master_pl_name master.m3u8 -f hls -hls_time 10 -hls_playlist_type vod -hls_list_size 0 -hls_segment_filename "${folderVideoPath}/%v/segmentNo%d.mp4" ${folderVideoPath}/%v/index.m3u8`;
-  //         console.log('command', command);
-  //         exec(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }, (error, stdout, stderr) => {
-  //           if (error) {
-  //             console.error(`Ошибка выполнения команды: ${error}`);
-  //             reject(error);
-  //             return;
-  //           }
-  //           console.log(`stdout: ${stdout}`);
-  //           console.error(`stderr: ${stderr}`);
-  //           resolve(stdout);
-  //         });
-  //       } catch (error) {
-  //         reject(`Failed to parse ffprobe output: ${error.message}`);
-  //       }
-  //     });
-  //   });
-  // }
-  // async toHlsUsingVideoCard(videoTmpPath, episodeName, resolutions) {
-  //   return new Promise((resolve, reject) => {
-  //     const qualityNamesByWidth = {
-  //       426: '240p',
-  //       640: '360p',
-  //       854: '480p',
-  //       1280: '720p',
-  //       1920: '1080p',
-  //       2560: '1440p',
-  //       3840: '2160p',
-  //       7680: '4320p',
-  //     };
-  //     const bandWidthsByWidth = {
-  //       426: 200,
-  //       640: 400,
-  //       854: 550,
-  //       1280: 1500,
-  //       1920: 4000,
-  //       2560: 8000,
-  //       3840: 16000,
-  //       7680: 32000,
-  //     };
-  //
-  //     const ffprobe = spawn('ffprobe', [
-  //       '-v',
-  //       'error',
-  //       '-select_streams',
-  //       'a',
-  //       '-show_entries',
-  //       'stream=index',
-  //       '-of',
-  //       'json',
-  //       videoTmpPath,
-  //     ]);
-  //
-  //     let stdout = '';
-  //     let stderr = '';
-  //
-  //     ffprobe.stdout.on('data', (data) => {
-  //       stdout += data.toString();
-  //     });
-  //
-  //     ffprobe.stderr.on('data', (data) => {
-  //       stderr += data.toString();
-  //     });
-  //
-  //     ffprobe.on('close', (code) => {
-  //       if (code !== 0) {
-  //         reject(`ffprobe exited with code ${code}: ${stderr}`);
-  //         return;
-  //       }
-  //
-  //       try {
-  //         const ffprobeOutput = JSON.parse(stdout);
-  //         const audioTracks = ffprobeOutput.streams.length;
-  //
-  //         let mapsCommand = '';
-  //         let resBtCommand = '';
-  //         let varStreamMapCommand = '';
-  //
-  //         for (let i = 0; i < resolutions.length; i++) {
-  //           const res = resolutions[i].replace('x', '*');
-  //           const width = Number(res.split('*')[0]);
-  //
-  //           // Add video stream mapping
-  //           mapsCommand += `-map 0:v:0 `;
-  //           resBtCommand += `-s:v:${i} ${res} -b:v:${i} ${bandWidthsByWidth[width]}k `;
-  //
-  //           // Add variant stream mapping
-  //           varStreamMapCommand += `v:${i},name:${qualityNamesByWidth[width]} `;
-  //         }
-  //
-  //         // Add audio stream mapping (once for all audio tracks)
-  //         for (let j = 0; j < audioTracks; j++) {
-  //           mapsCommand += `-map 0:a:${j} `;
-  //           varStreamMapCommand += `a:${j},name:audio${j} `;
-  //         }
-  //
-  //         const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'video', episodeName);
-  //
-  //         const command = `ffmpeg -y -hwaccel cuda -i ${videoTmpPath} -preset slow -g 48 -sc_threshold 0 ${mapsCommand}${resBtCommand}-c:v h264_nvenc -c:a aac -var_stream_map "${varStreamMapCommand.trim()}" -master_pl_name master.m3u8 -f hls -hls_time 10 -hls_playlist_type vod -hls_list_size 0 -hls_segment_filename "${folderVideoPath}/%v/segmentNo%d.mp4" ${folderVideoPath}/%v/index.m3u8`;
-  //         console.log(command);
-  //         exec(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }, (error, stdout, stderr) => {
-  //           if (error) {
-  //             console.error(`Ошибка выполнения команды: ${error}`);
-  //             reject(error);
-  //             return;
-  //           }
-  //           console.log(`stdout: ${stdout}`);
-  //           console.error(`stderr: ${stderr}`);
-  //           resolve(stdout);
-  //         });
-  //       } catch (error) {
-  //         reject(`Failed to parse ffprobe output: ${error.message}`);
-  //       }
-  //     });
-  //   });
-  // }
-  // async toHlsUsingVideoCard(videoTmpPath, episodeName, resolutions) {
-  //   return new Promise((resolve, reject) => {
-  //     const qualityNamesByWidth = {
-  //       426: '240p',
-  //       640: '360p',
-  //       854: '480p',
-  //       1280: '720p',
-  //       1920: '1080p',
-  //       2560: '1440p',
-  //       3840: '2160p',
-  //       7680: '4320p',
-  //     };
-  //     const bandWidthsByWidth = {
-  //       426: 200,
-  //       640: 400,
-  //       854: 550,
-  //       1280: 1500,
-  //       1920: 4000,
-  //       2560: 8000,
-  //       3840: 16000,
-  //       7680: 32000,
-  //     };
-  //
-  //     const ffprobe = spawn('ffprobe', [
-  //       '-v',
-  //       'error',
-  //       '-select_streams',
-  //       'a',
-  //       '-show_entries',
-  //       'stream=index',
-  //       '-of',
-  //       'json',
-  //       videoTmpPath,
-  //     ]);
-  //
-  //     let stdout = '';
-  //     let stderr = '';
-  //
-  //     ffprobe.stdout.on('data', (data) => {
-  //       stdout += data.toString();
-  //     });
-  //
-  //     ffprobe.stderr.on('data', (data) => {
-  //       stderr += data.toString();
-  //     });
-  //
-  //     ffprobe.on('close', (code) => {
-  //       if (code !== 0) {
-  //         reject(`ffprobe exited with code ${code}: ${stderr}`);
-  //         return;
-  //       }
-  //
-  //       try {
-  //         const ffprobeOutput = JSON.parse(stdout);
-  //         const audioTracks = ffprobeOutput.streams.length;
-  //
-  //         let mapsCommand = '';
-  //         let resBtCommand = '';
-  //         let varStreamMapCommand = '';
-  //
-  //         for (let i = 0; i < resolutions.length; i++) {
-  //           const res = resolutions[i].replace('x', '*');
-  //           const width = Number(res.split('*')[0]);
-  //
-  //           // Add video stream mapping
-  //           mapsCommand += `-map 0:v:0 `;
-  //           resBtCommand += `-s:v:${i} ${res} -b:v:${i} ${bandWidthsByWidth[width]}k `;
-  //
-  //           // Add variant stream mapping
-  //           varStreamMapCommand += `v:${i},name:${qualityNamesByWidth[width]} `;
-  //         }
-  //
-  //         // Add audio stream mapping (once for all audio tracks)
-  //         for (let j = 0; j < audioTracks; j++) {
-  //           mapsCommand += `-map 0:a:${j} `;
-  //           varStreamMapCommand += `a:${j},name:audio${j} `;
-  //         }
-  //
-  //         const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'video', episodeName);
-  //
-  //         const command = `ffmpeg -y -hwaccel cuda -i ${videoTmpPath} -preset slow -g 48 -sc_threshold 0 ${mapsCommand}${resBtCommand}-c:v h264_nvenc -c:a aac -var_stream_map "${varStreamMapCommand.trim()}" -master_pl_name master.m3u8 -f hls -hls_time 10 -hls_playlist_type vod -hls_list_size 0 -hls_segment_filename "${folderVideoPath}/%v/segmentNo%d.mp4" -hls_segment_type fmp4 ${folderVideoPath}/%v/index.m3u8`;
-  //         console.log(command);
-  //         exec(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }, (error, stdout, stderr) => {
-  //           if (error) {
-  //             console.error(`Ошибка выполнения команды: ${error}`);
-  //             reject(error);
-  //             return;
-  //           }
-  //           console.log(`stdout: ${stdout}`);
-  //           console.error(`stderr: ${stderr}`);
-  //           resolve(stdout);
-  //         });
-  //       } catch (error) {
-  //         reject(`Failed to parse ffprobe output: ${error.message}`);
-  //       }
-  //     });
-  //   });
-  // }
-  // async toHlsUsingVideoCard(
-  //   videoTmpPath: string,
-  //   episodeName: string,
+
+  editMasterManifest(
+    resolutions: string[],
+    audioTracks: IAudioInfoTrack[],
+    existManifestPath: string,
+  ) {
+    let audioInfo = '';
+
+    // Add audio track information
+    for (const track of audioTracks) {
+      audioInfo += `#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="${track.title}",LANGUAGE="${track.language}",DEFAULT=${track.default.toUpperCase()},AUTOSELECT=YES,URI="audio_${track.index}/index.m3u8"\n`;
+    }
+
+    let manifest = fs.readFileSync(existManifestPath, 'utf8');
+    console.log('manifest', manifest);
+
+    const audioCodec = audioTracks[0].codec;
+
+    manifest = manifest
+      .replace(/\\/g, '/')
+      .replace(/CODECS="([^"]+)"/g, `CODECS="$1,${audioCodec}"`)
+      .replace(/#EXT-X-STREAM-INF:(.*)\n(.*)/g, '#EXT-X-STREAM-INF:$1,AUDIO="audio"\n$2');
+
+    console.log('manifest', manifest);
+
+    // Insert audio track information at the correct place
+    const versionIndex = manifest.indexOf('#EXT-X-VERSION:3');
+    const updatedManifest =
+      manifest.slice(0, versionIndex + 16) + '\n\n' + audioInfo + manifest.slice(versionIndex + 16);
+
+    // Save the updated manifest
+    fs.writeFileSync(existManifestPath, updatedManifest, 'utf8');
+  }
+
+  // createMasterManifest(
   //   resolutions: string[],
-  // ): Promise<void> {
-  //   return new Promise((resolve, reject) => {
-  //     const qualityNamesByWidth = {
-  //       426: '240p',
-  //       640: '360p',
-  //       854: '480p',
-  //       1280: '720p',
-  //       1920: '1080p',
-  //       2560: '1440p',
-  //       3840: '2160p',
-  //       7680: '4320p',
-  //     };
+  //   audioTracks: IAudioInfoTrack[],
+  //   qualityNamesByWidth: { [key: number]: string },
+  //   folderVideoPath: string,
+  //   videoTrack: any,
+  // ): string {
+  //   const bandWidthsByWidth = {
+  //     426: 360800,
+  //     640: 580800,
+  //     854: 745800,
+  //     1280: 1790800,
+  //     1920: 4540800,
+  //     2560: 9000800,
+  //     3840: 18000800,
+  //     7680: 36000800,
+  //   };
   //
-  //     const bandWidthsByWidth = {
-  //       426: 200,
-  //       640: 400,
-  //       854: 550,
-  //       1280: 1500,
-  //       1920: 4000,
-  //       2560: 8000,
-  //       3840: 16000,
-  //       7680: 32000,
-  //     };
+  //   let manifest = '#EXTM3U\n#EXT-X-VERSION:3\n';
   //
-  //     const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'video', episodeName);
-  //
-  //     // Ensure the output directory exists
-  //     mkdirAsync(folderVideoPath, { recursive: true }).catch((err) => {
-  //       console.error(`Failed to create directory: ${folderVideoPath}`, err);
-  //       reject(err);
-  //     });
-  //
-  //     // Determine audio streams in the video file
-  //     const ffprobe = spawn('ffprobe', [
-  //       '-v',
-  //       'error',
-  //       '-select_streams',
-  //       'a',
-  //       '-show_entries',
-  //       'stream=index',
-  //       '-of',
-  //       'json',
-  //       videoTmpPath,
-  //     ]);
-  //
-  //     let stdout = '';
-  //     let stderr = '';
-  //
-  //     ffprobe.stdout.on('data', (data) => {
-  //       stdout += data.toString();
-  //     });
-  //
-  //     ffprobe.stderr.on('data', (data) => {
-  //       stderr += data.toString();
-  //     });
-  //
-  //     ffprobe.on('close', (code) => {
-  //       if (code !== 0) {
-  //         reject(`ffprobe exited with code ${code}: ${stderr}`);
-  //         return;
-  //       }
-  //
-  //       try {
-  //         const ffprobeOutput = JSON.parse(stdout);
-  //         const audioTracks = ffprobeOutput.streams.length;
-  //
-  //         // Extract audio tracks to AAC files
-  //         const audioExtractPromises = [];
-  //         for (let j = 0; j < audioTracks; j++) {
-  //           const audioFileName = path.join(folderVideoPath, `${episodeName}_audio${j}.aac`);
-  //           const audioExtractCommand = [
-  //             '-i',
-  //             videoTmpPath,
-  //             '-map',
-  //             `0:a:${j}`,
-  //             '-c:a',
-  //             'aac',
-  //             audioFileName,
-  //           ];
-  //
-  //           audioExtractPromises.push(this.executeCommand(audioExtractCommand));
-  //         }
-  //
-  //         // Wait for all audio extraction commands to finish
-  //         Promise.all(audioExtractPromises)
-  //           .then(() => {
-  //             // Generate HLS manifest with video and extracted audio files
-  //             const hlsCommands = [];
-  //             let mapsCommand = '';
-  //             let resBtCommand = '';
-  //             let varStreamMapCommand = '';
-  //
-  //             for (let i = 0; i < resolutions.length; i++) {
-  //               const res = resolutions[i].replace('x', '*');
-  //               const width = Number(res.split('*')[0]);
-  //
-  //               mapsCommand += `-map 0:v:0 `;
-  //               resBtCommand += `-s:v:${i} ${res} -b:v:${i} ${bandWidthsByWidth[width]}k `;
-  //               varStreamMapCommand += `v:${i},name:${qualityNamesByWidth[width]} `;
-  //             }
-  //
-  //             for (let j = 0; j < audioTracks; j++) {
-  //               mapsCommand += `-map ${folderVideoPath}/${episodeName}_audio${j}.aac `;
-  //               varStreamMapCommand += `a:${j} `;
-  //             }
-  //
-  //             const hlsCommand = [
-  //               '-i',
-  //               videoTmpPath,
-  //               '-preset',
-  //               'slow',
-  //               '-g',
-  //               '48',
-  //               '-sc_threshold',
-  //               '0',
-  //               mapsCommand,
-  //               resBtCommand,
-  //               '-c:v',
-  //               'h264_nvenc',
-  //               '-c:a',
-  //               'copy', // copy the extracted audio files as is
-  //               '-var_stream_map',
-  //               `"${varStreamMapCommand.trim()}"`,
-  //               '-master_pl_name',
-  //               'master.m3u8',
-  //               '-f',
-  //               'hls',
-  //               '-hls_time',
-  //               '10',
-  //               '-hls_playlist_type',
-  //               'vod',
-  //               '-hls_list_size',
-  //               '0',
-  //               '-hls_segment_filename',
-  //               `${folderVideoPath}/%v/segmentNo%d.mp4`,
-  //               `${folderVideoPath}/%v/index.m3u8`,
-  //             ];
-  //
-  //             this.executeCommand(hlsCommand)
-  //               .then(() => {
-  //                 console.log('HLS generation completed successfully');
-  //                 resolve();
-  //               })
-  //               .catch((error) => {
-  //                 reject(`Error executing HLS command: ${error}`);
-  //               });
-  //           })
-  //           .catch((error) => {
-  //             reject(`Error extracting audio tracks: ${error}`);
-  //           });
-  //       } catch (error) {
-  //         reject(`Failed to parse ffprobe output: ${error.message}`);
-  //       }
-  //     });
-  //   });
-  // }
-  // // Function to execute multiple ffmpeg commands in series
-  // private async executeCommands(commands) {
-  //   for (let i = 0; i < commands.length; i++) {
-  //     await this.executeCommand(commands[i]);
+  //   // Add audio track information
+  //   for (const track of audioTracks) {
+  //     manifest += `#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="${track.title}",LANGUAGE="${track.language}",DEFAULT=${track.default.toUpperCase()},AUTOSELECT=YES,URI="audio_${track.index}/index.m3u8"\n`;
   //   }
-  // }
   //
-  // // Function to execute a single ffmpeg command
-  // private async executeCommand(command: string[]): Promise<void> {
-  //   return new Promise<void>((resolve, reject) => {
-  //     const cmd = spawn('ffmpeg', command);
+  //   const videoCodec = videoTrack.CodecID === 'avc1' ? 'avc1.4d400d' : videoTrack.CodecID;
   //
-  //     cmd.stdout.on('data', (data) => {
-  //       console.log(`stdout: ${data}`);
-  //     });
+  //   // Add video stream information
+  //   for (const resolution of resolutions) {
+  //     const width = Number(resolution.split('x')[0]);
+  //     const audioCodec = audioTracks[0].codec;
+  //     manifest += `#EXT-X-STREAM-INF:BANDWIDTH=${bandWidthsByWidth[width]},RESOLUTION=${resolution},CODECS="${videoCodec},${audioCodec}"\n`;
+  //     manifest += `${qualityNamesByWidth[width]}/index.m3u8\n`;
+  //   }
   //
-  //     cmd.stderr.on('data', (data) => {
-  //       console.error(`stderr: ${data}`);
-  //     });
-  //
-  //     cmd.on('close', (code) => {
-  //       if (code === 0) {
-  //         resolve();
-  //       } else {
-  //         reject(`ffmpeg command failed with code ${code}`);
-  //       }
-  //     });
-  //   });
+  //   return manifest;
   // }
 
   async extractThumbnails(
@@ -711,12 +442,13 @@ export class FfmpegService {
           const subtitlesInfo = subtitlesFromFFProbe.map((subtitle, idx) => ({
             ...subtitle,
             index: idx, // Заменяем индекс на индекс, начинающийся с 0
-            createdName: `(${subtitle.tags.language})_${subtitle.tags?.title || ''}`,
+            createdName: `(${subtitle.tags.language})_${subtitle.tags?.title || idx + 1}`,
           }));
 
           const subsExtByCodec = {
             subrip: 'srt',
             aas: 'aas',
+            mov_text: 'srt', // Добавляем поддержку mov_text
           };
 
           const folderSubtitlesPath = path.join(
@@ -746,7 +478,7 @@ export class FfmpegService {
                 '-map',
                 `0:s:${subtitle.index}`,
                 '-c:s',
-                'copy',
+                'srt',
                 path.join(folderSubtitlesPath, subFileName),
               ];
 
@@ -754,6 +486,7 @@ export class FfmpegService {
 
               extractProcess.on('close', (code) => {
                 if (code !== 0) {
+                  console.error(`ffmpeg extract stderr: ${stderr}`);
                   reject(new Error(`ffmpeg extract exited with code ${code}`));
                 } else {
                   resolve();
@@ -774,6 +507,7 @@ export class FfmpegService {
 
               convertProcess.on('close', (code) => {
                 if (code !== 0) {
+                  console.error(`ffmpeg convert stderr: ${stderr}`);
                   reject(new Error(`ffmpeg convert exited with code ${code}`));
                 } else {
                   resolve();
