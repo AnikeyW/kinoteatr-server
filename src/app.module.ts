@@ -13,6 +13,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { Mp4boxModule } from './mp4box/mp4box.module';
 import { GuidesModule } from './guides/guides.module';
 import { SubtitlesModule } from './subtitles/subtitles.module';
+import { MediainfoModule } from './mediainfo/mediainfo.module';
 import * as process from 'process';
 
 @Module({
@@ -40,6 +41,7 @@ import * as process from 'process';
     Mp4boxModule,
     GuidesModule,
     SubtitlesModule,
+    MediainfoModule,
   ],
 })
 export class AppModule {}

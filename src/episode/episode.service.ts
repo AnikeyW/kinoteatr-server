@@ -12,6 +12,7 @@ import { FileService } from '../file/file.service';
 import { Mp4boxService } from '../mp4box/mp4box.service';
 import { EditEpisodeDto, IExistSubtitles } from './dto/edit-episode.dto';
 import { SubtitlesService } from '../subtitles/subtitles.service';
+import { MediainfoService } from '../mediainfo/mediainfo.service';
 
 const mkdirAsync = promisify(fs.mkdir);
 
@@ -23,6 +24,7 @@ export class EpisodeService {
     private mp4boxService: Mp4boxService,
     private fileService: FileService,
     private subtitlesService: SubtitlesService,
+    private mediainfoService: MediainfoService,
   ) {}
 
   async createEpisode(videoTmpPath: string, dto: CreateEpisodeDto) {
@@ -38,6 +40,9 @@ export class EpisodeService {
 
     try {
       const episodeName = uuid.v4();
+
+      const videoInfo = await this.mediainfoService.getVideoInfo(videoTmpPath);
+      console.log('episodservis video info', videoInfo);
 
       const videoDuration = await this.ffmpegService.getVideoDuration(videoTmpPath);
 

@@ -103,7 +103,8 @@ export class FfmpegService {
       7680: 32000,
     };
 
-    const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'video', episodeName);
+    const folderVideoPathWindow = path.join(__dirname, '..', '..', 'static', 'video', episodeName);
+    const folderVideoPath = folderVideoPathWindow.replace(/\\/g, '/');
 
     try {
       await mkdirAsync(folderVideoPath, { recursive: true });
@@ -133,14 +134,12 @@ export class FfmpegService {
       });
 
       const mediainfoJson = JSON.parse(mediainfoOutput);
-      console.log('mediainfoJson', mediainfoJson);
-      const videoTrack = mediainfoJson.media.track.find((track: any) => track['@type'] === 'Video');
-      console.log('videoTrack', videoTrack);
+      // const videoTrack = mediainfoJson.media.track.find((track: any) => track['@type'] === 'Video');
 
       const audioTracksFull = mediainfoJson.media.track.filter(
         (track: any) => track['@type'] === 'Audio',
       );
-      console.log('audioTracksFull', audioTracksFull);
+
       const audioTracks: IAudioInfoTrack[] = audioTracksFull.map((audio, index) => ({
         index: index,
         bitrate: audio.BitRate,
@@ -165,37 +164,24 @@ export class FfmpegService {
       let varStreamMap = '';
       for (let i = 0; i < resolutions.length; i++) {
         const width = Number(resolutions[i].split('x')[0]);
-        const folderQaulityPath = path.join(folderVideoPath, qualityNamesByWidth[width]);
-        fs.mkdirSync(folderQaulityPath, { recursive: true });
         videoMaps.push('-map');
         videoMaps.push('0:v:0');
         videoMaps.push(`-s:v:${i}`);
         videoMaps.push(`${resolutions[i]}`);
         videoMaps.push(`-b:v:${i}`);
         videoMaps.push(`${bandWidthsByWidth[width]}k`);
-        varStreamMap += `v:${i},name:${qualityNamesByWidth[width]} `;
+        varStreamMap += `v:${i},name:${qualityNamesByWidth[width]},agroup:audio `;
       }
       for (let i = 0; i < audioTracks.length; i++) {
-        const folderAudioPath = path.join(folderVideoPath, `audio_${i}`);
-        fs.mkdirSync(folderAudioPath, { recursive: true });
         audioMaps.push('-map');
         audioMaps.push(`0:a:${i}`);
         audioMaps.push(`-c:a`);
         audioMaps.push(`aac`);
         audioMaps.push(`-ac`);
         audioMaps.push(`2`);
-        // audioMaps.push(`${audioTracks[i].channels}`);
         audioMaps.push(`-b:a`);
         audioMaps.push(`${formatBitrate(audioTracks[i].bitrate)}`);
-        audioMaps.push(`-f`);
-        audioMaps.push(`hls`);
-        audioMaps.push(`-hls_time`);
-        audioMaps.push(`10`);
-        audioMaps.push(`-hls_list_size`);
-        audioMaps.push(`0`);
-        audioMaps.push(`-hls_segment_filename`);
-        audioMaps.push(`"${path.join(folderAudioPath, 'segmentNo%d.mp4')}"`);
-        audioMaps.push(`${path.join(folderAudioPath, 'index.m3u8')}`);
+        varStreamMap += `a:${i},name:audio_${i},agroup:audio,language:${audioTracks[i].language}${audioTracks[i].default.toUpperCase() === 'YES' ? ',default:yes' : ''} `;
       }
 
       const hlsCommand = [
@@ -214,6 +200,7 @@ export class FfmpegService {
         ...videoMaps,
         '-c:v',
         'h264_nvenc',
+        ...audioMaps,
         '-var_stream_map',
         `"${varStreamMap.trim()}"`,
         '-f',
@@ -229,7 +216,6 @@ export class FfmpegService {
         '-master_pl_name',
         'master.m3u8',
         `${path.join(folderVideoPath, '%v', 'index.m3u8')}`,
-        ...audioMaps,
       ];
 
       const command = hlsCommand.join(' ');
@@ -251,17 +237,7 @@ export class FfmpegService {
 
       console.log('HLS generation completed successfully');
 
-      this.editMasterManifest(resolutions, audioTracks, path.join(folderVideoPath, 'master.m3u8'));
-
-      // const masterManifest = this.createMasterManifest(
-      //   resolutions,
-      //   audioTracks,
-      //   qualityNamesByWidth,
-      //   folderVideoPath,
-      //   videoTrack,
-      // );
-      // console.log('masterManifest', masterManifest);
-      // fs.writeFileSync(path.join(folderVideoPath, 'master.m3u8'), masterManifest);
+      this.editMasterManifest(audioTracks, path.join(folderVideoPath, 'master.m3u8'));
 
       return { resolutions, audioTracks };
     } catch (error) {
@@ -270,76 +246,28 @@ export class FfmpegService {
     }
   }
 
-  editMasterManifest(
-    resolutions: string[],
-    audioTracks: IAudioInfoTrack[],
-    existManifestPath: string,
-  ) {
-    let audioInfo = '';
+  editMasterManifest(audioTracks: IAudioInfoTrack[], existManifestPath: string) {
+    try {
+      let masterManifest = fs.readFileSync(existManifestPath, 'utf8');
 
-    // Add audio track information
-    for (const track of audioTracks) {
-      audioInfo += `#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="${track.title}",LANGUAGE="${track.language}",DEFAULT=${track.default.toUpperCase()},AUTOSELECT=YES,URI="audio_${track.index}/index.m3u8"\n`;
+      masterManifest = masterManifest.replace(/\\/g, '/');
+
+      audioTracks.forEach((track) => {
+        const uriRegex = new RegExp(`(.*URI="audio_${track.index}/index.m3u8".*)`, 'g');
+
+        masterManifest = masterManifest.replace(uriRegex, (match) => {
+          const nameRegex = new RegExp(`NAME="[^"]+"`);
+          return match.replace(nameRegex, `NAME="${track.title}"`);
+        });
+      });
+
+      fs.writeFileSync(existManifestPath, masterManifest, 'utf8');
+
+      console.log('Манифест успешно обновлен.');
+    } catch (error) {
+      console.error('Ошибка при обновлении манифеста:', error);
     }
-
-    let manifest = fs.readFileSync(existManifestPath, 'utf8');
-    console.log('manifest', manifest);
-
-    const audioCodec = audioTracks[0].codec;
-
-    manifest = manifest
-      .replace(/\\/g, '/')
-      .replace(/CODECS="([^"]+)"/g, `CODECS="$1,${audioCodec}"`)
-      .replace(/#EXT-X-STREAM-INF:(.*)\n(.*)/g, '#EXT-X-STREAM-INF:$1,AUDIO="audio"\n$2');
-
-    console.log('manifest', manifest);
-
-    // Insert audio track information at the correct place
-    const versionIndex = manifest.indexOf('#EXT-X-VERSION:3');
-    const updatedManifest =
-      manifest.slice(0, versionIndex + 16) + '\n\n' + audioInfo + manifest.slice(versionIndex + 16);
-
-    // Save the updated manifest
-    fs.writeFileSync(existManifestPath, updatedManifest, 'utf8');
   }
-
-  // createMasterManifest(
-  //   resolutions: string[],
-  //   audioTracks: IAudioInfoTrack[],
-  //   qualityNamesByWidth: { [key: number]: string },
-  //   folderVideoPath: string,
-  //   videoTrack: any,
-  // ): string {
-  //   const bandWidthsByWidth = {
-  //     426: 360800,
-  //     640: 580800,
-  //     854: 745800,
-  //     1280: 1790800,
-  //     1920: 4540800,
-  //     2560: 9000800,
-  //     3840: 18000800,
-  //     7680: 36000800,
-  //   };
-  //
-  //   let manifest = '#EXTM3U\n#EXT-X-VERSION:3\n';
-  //
-  //   // Add audio track information
-  //   for (const track of audioTracks) {
-  //     manifest += `#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="${track.title}",LANGUAGE="${track.language}",DEFAULT=${track.default.toUpperCase()},AUTOSELECT=YES,URI="audio_${track.index}/index.m3u8"\n`;
-  //   }
-  //
-  //   const videoCodec = videoTrack.CodecID === 'avc1' ? 'avc1.4d400d' : videoTrack.CodecID;
-  //
-  //   // Add video stream information
-  //   for (const resolution of resolutions) {
-  //     const width = Number(resolution.split('x')[0]);
-  //     const audioCodec = audioTracks[0].codec;
-  //     manifest += `#EXT-X-STREAM-INF:BANDWIDTH=${bandWidthsByWidth[width]},RESOLUTION=${resolution},CODECS="${videoCodec},${audioCodec}"\n`;
-  //     manifest += `${qualityNamesByWidth[width]}/index.m3u8\n`;
-  //   }
-  //
-  //   return manifest;
-  // }
 
   async extractThumbnails(
     videoTmpPath: string,
@@ -439,6 +367,7 @@ export class FfmpegService {
           const subtitlesInfoFull = JSON.parse(stdout);
 
           const subtitlesFromFFProbe: IExtractedSubtitles[] = subtitlesInfoFull.streams || [];
+          console.log('subtitlesFromFFProbe', subtitlesFromFFProbe);
           const subtitlesInfo = subtitlesFromFFProbe.map((subtitle, idx) => ({
             ...subtitle,
             index: idx, // Заменяем индекс на индекс, начинающийся с 0

@@ -1,6 +1,6 @@
 export interface IExtractedSubtitles {
   index: number;
-  codec_name: 'subrip' | 'ass';
+  codec_name: 'subrip' | 'ass' | 'mov_text';
   codec_type: string;
   tags: {
     language: string;
