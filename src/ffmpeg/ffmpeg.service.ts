@@ -3,11 +3,9 @@ import { exec, spawn } from 'child_process';
 import * as path from 'path';
 import { promisify } from 'util';
 import * as fs from 'fs';
-import {
-  ExtractedSubtitlesWithCreatedName,
-  IExtractedSubtitles,
-} from '../subtitles/extractedSubtitlesType';
+import { ExtractedSubtitlesWithCreatedName } from '../subtitles/extractedSubtitlesType';
 import { IAudioInfoTrack } from './types';
+import { IVideoInfo } from '../mediainfo/mediainfo.service';
 
 const execPromise = promisify(exec);
 const mkdirAsync = promisify(fs.mkdir);
@@ -15,72 +13,45 @@ const unlinkAsync = promisify(fs.unlink);
 
 @Injectable()
 export class FfmpegService {
-  async getVideoDuration(filePath: string): Promise<number> {
-    return new Promise((resolve, reject) => {
-      const ffprobe = spawn('ffprobe', [
-        '-v',
-        'error',
-        '-show_entries',
-        'format=duration',
-        '-of',
-        'default=noprint_wrappers=1:nokey=1',
-        filePath,
-      ]);
-
-      let duration = '';
-
-      ffprobe.stdout.on('data', (data) => {
-        duration += data.toString();
-      });
-
-      ffprobe.on('close', (code) => {
-        if (code !== 0) {
-          reject(`ffprobe exited with code ${code}`);
-          return;
-        }
-
-        resolve(Math.round(parseFloat(duration)));
-      });
-    });
-  }
-
-  async getVideoResolution(filePath: string): Promise<{ width: number; height: number }> {
-    return new Promise((resolve, reject) => {
-      const ffprobe = spawn('ffprobe', [
-        '-v',
-        'error',
-        '-select_streams',
-        'v:0',
-        '-show_entries',
-        'stream=width,height',
-        '-of',
-        'default=noprint_wrappers=1:nokey=1',
-        filePath,
-      ]);
-
-      let resolution = '';
-
-      ffprobe.stdout.on('data', (data) => {
-        resolution += data.toString();
-      });
-
-      ffprobe.on('close', (code) => {
-        if (code !== 0) {
-          reject(`ffprobe exited with code ${code}`);
-          return;
-        }
-
-        const [width, height] = resolution.trim().split('\n');
-        resolve({ width: parseInt(width), height: parseInt(height) });
-      });
-    });
-  }
-
   async toHlsUsingVideoCard(
     videoTmpPath: string,
     episodeName: string,
-    resolutions: string[],
-  ): Promise<{ resolutions: string[]; audioTracks: IAudioInfoTrack[] }> {
+    videoInfo: IVideoInfo,
+  ): Promise<string> {
+    const aspectRatio = (videoInfo.resolution.width / videoInfo.resolution.height).toFixed(2);
+
+    const resolutions_16_9 = [
+      '426x240', // 240p
+      '640x360', // 360p
+      '854x480', // 480p
+      '1280x720', // 720p
+      '1920x1080', // 1080p
+      '2560x1440', // 1440p (2K)
+      '3840x2160', // 2160p (4K)
+      '7680x4320', // 4320p (8K)
+    ];
+
+    const resolutions_2_1 = [
+      '426x213',
+      '640x320',
+      '854x427',
+      '1280x640',
+      '1920x960',
+      '2560x1280',
+      '3840x1920',
+      '7680x3840',
+    ];
+
+    const resolutionsByAspectRatio = {
+      '1.78': resolutions_16_9,
+      '1.77': resolutions_16_9,
+      '2.00': resolutions_2_1,
+    };
+
+    const resolutions = resolutionsByAspectRatio[aspectRatio].filter(
+      (r) => Number(r.split('x')[0]) <= videoInfo.resolution.width,
+    );
+
     const qualityNamesByWidth = {
       426: '240p',
       640: '360p',
@@ -109,55 +80,7 @@ export class FfmpegService {
     try {
       await mkdirAsync(folderVideoPath, { recursive: true });
 
-      // Determine audio streams in the video file using mediainfo
-      const mediainfoOutput = await new Promise<string>((resolve, reject) => {
-        const mediainfo = spawn('mediainfo', ['--Output=JSON', videoTmpPath]);
-
-        let stdout = '';
-        let stderr = '';
-
-        mediainfo.stdout.on('data', (data) => {
-          stdout += data.toString();
-        });
-
-        mediainfo.stderr.on('data', (data) => {
-          stderr += data.toString();
-        });
-
-        mediainfo.on('close', (code) => {
-          if (code === 0) {
-            resolve(stdout);
-          } else {
-            reject(new Error(`mediainfo exited with code ${code}: ${stderr}`));
-          }
-        });
-      });
-
-      const mediainfoJson = JSON.parse(mediainfoOutput);
-      // const videoTrack = mediainfoJson.media.track.find((track: any) => track['@type'] === 'Video');
-
-      const audioTracksFull = mediainfoJson.media.track.filter(
-        (track: any) => track['@type'] === 'Audio',
-      );
-
-      const audioTracks: IAudioInfoTrack[] = audioTracksFull.map((audio, index) => ({
-        index: index,
-        bitrate: audio.BitRate,
-        title: audio.Title,
-        language: audio.Language,
-        default: audio.Default,
-        format: audio.Format,
-        channels: audio.Channels,
-        channelPositions: audio.ChannelPositions,
-        codec: audio.CodecID,
-      }));
-
-      function formatBitrate(bitrateStr) {
-        if (bitrateStr.length > 3 && bitrateStr.endsWith('000')) {
-          return bitrateStr.slice(0, -3) + 'k';
-        }
-        return bitrateStr + 'k';
-      }
+      const audioTracks = videoInfo.audioTracks;
 
       let videoMaps: string[] = [];
       let audioMaps: string[] = [];
@@ -180,7 +103,7 @@ export class FfmpegService {
         audioMaps.push(`-ac`);
         audioMaps.push(`2`);
         audioMaps.push(`-b:a`);
-        audioMaps.push(`${formatBitrate(audioTracks[i].bitrate)}`);
+        audioMaps.push(audioTracks[i].bitrate);
         varStreamMap += `a:${i},name:audio_${i},agroup:audio,language:${audioTracks[i].language}${audioTracks[i].default.toUpperCase() === 'YES' ? ',default:yes' : ''} `;
       }
 
@@ -222,7 +145,7 @@ export class FfmpegService {
 
       console.log('command', command);
 
-      const result = await new Promise<string>((resolve, reject) => {
+      await new Promise<string>((resolve, reject) => {
         exec(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }, (error, stdout, stderr) => {
           if (error) {
             console.error(`Ошибка выполнения команды: ${error}`);
@@ -239,7 +162,7 @@ export class FfmpegService {
 
       this.editMasterManifest(audioTracks, path.join(folderVideoPath, 'master.m3u8'));
 
-      return { resolutions, audioTracks };
+      return path.join('video', episodeName, 'master.m3u8');
     } catch (error) {
       console.error(`Error in toHlsUsingVideoCard: ${error.message}`);
       throw error;
@@ -332,149 +255,126 @@ export class FfmpegService {
   async extractSubtitles(
     videoTmpPath: string,
     episodeName: string,
+    videoInfo: IVideoInfo,
   ): Promise<ExtractedSubtitlesWithCreatedName[]> {
-    return new Promise<ExtractedSubtitlesWithCreatedName[]>((resolve, reject) => {
-      const ffprobe = spawn('ffprobe', [
-        '-v',
-        'error',
-        '-select_streams',
-        's',
-        '-show_entries',
-        'stream=index,codec_type,codec_name:stream_tags=language,title',
-        '-of',
-        'json',
-        videoTmpPath,
-      ]);
+    try {
+      const subtitlesInfo = videoInfo.subtitlesInfo.map((subtitle, idx) => ({
+        ...subtitle,
+        index: idx,
+        createdName: `(${subtitle.language})_${subtitle.title || idx + 1}`,
+      }));
 
-      let stdout = '';
-      let stderr = '';
+      const subsExtByCodec = {
+        subrip: 'srt',
+        ass: 'ass',
+        mov_text: 'srt',
+      };
 
-      ffprobe.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
+      const folderSubtitlesPath = path.join(
+        __dirname,
+        '..',
+        '..',
+        'static',
+        'subtitles',
+        episodeName,
+      );
 
-      ffprobe.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
+      // Создание директории для субтитров
+      try {
+        await mkdirAsync(folderSubtitlesPath, { recursive: true });
+        console.log(`Directory created: ${folderSubtitlesPath}`);
+      } catch (error) {
+        console.error(`Error creating directory: ${error}`);
+        throw new Error(`Error creating directory: ${error.message}`);
+      }
 
-      ffprobe.on('close', async (code) => {
-        if (code !== 0) {
-          reject(`ffprobe exited with code ${code}: ${stderr}`);
-          return;
-        }
+      const extractSubtitles = (subtitle, subFileName) => {
+        return new Promise<void>((resolve, reject) => {
+          const extractSubsCommand = [
+            '-i',
+            videoTmpPath,
+            '-map',
+            `0:s:${subtitle.index}`,
+            '-c:s',
+            'srt',
+            path.join(folderSubtitlesPath, subFileName),
+          ];
 
-        try {
-          const subtitlesInfoFull = JSON.parse(stdout);
+          const extractProcess = spawn('ffmpeg', extractSubsCommand);
 
-          const subtitlesFromFFProbe: IExtractedSubtitles[] = subtitlesInfoFull.streams || [];
-          console.log('subtitlesFromFFProbe', subtitlesFromFFProbe);
-          const subtitlesInfo = subtitlesFromFFProbe.map((subtitle, idx) => ({
-            ...subtitle,
-            index: idx, // Заменяем индекс на индекс, начинающийся с 0
-            createdName: `(${subtitle.tags.language})_${subtitle.tags?.title || idx + 1}`,
-          }));
+          let stderr = '';
 
-          const subsExtByCodec = {
-            subrip: 'srt',
-            aas: 'aas',
-            mov_text: 'srt', // Добавляем поддержку mov_text
-          };
+          extractProcess.stderr.on('data', (data) => {
+            stderr += data.toString();
+          });
 
-          const folderSubtitlesPath = path.join(
-            __dirname,
-            '..',
-            '..',
-            'static',
-            'subtitles',
-            episodeName,
-          );
+          extractProcess.on('close', (code) => {
+            if (code !== 0) {
+              console.error(`ffmpeg extract stderr: ${stderr}`);
+              reject(new Error(`ffmpeg extract exited with code ${code}`));
+            } else {
+              resolve();
+            }
+          });
+        });
+      };
 
+      const convertSubtitles = (subFileName, vttFileName) => {
+        return new Promise<void>((resolve, reject) => {
+          const convertSubsCommand = [
+            '-i',
+            path.join(folderSubtitlesPath, subFileName),
+            path.join(folderSubtitlesPath, vttFileName),
+          ];
+
+          const convertProcess = spawn('ffmpeg', convertSubsCommand);
+
+          let stderr = '';
+
+          convertProcess.stderr.on('data', (data) => {
+            stderr += data.toString();
+          });
+
+          convertProcess.on('close', (code) => {
+            if (code !== 0) {
+              console.error(`ffmpeg convert stderr: ${stderr}`);
+              reject(new Error(`ffmpeg convert exited with code ${code}`));
+            } else {
+              resolve();
+            }
+          });
+        });
+      };
+
+      const processSubtitles = async () => {
+        const promises = subtitlesInfo.map(async (subtitle) => {
+          const subExt = subsExtByCodec[subtitle.codec];
+          const subFileName = `${subtitle.createdName}.${subExt}`;
+          const vttFileName = `${subtitle.createdName}.vtt`;
+
+          await extractSubtitles(subtitle, subFileName);
+          await convertSubtitles(subFileName, vttFileName);
+
+          // Удаление исходного файла субтитров после конвертации
           try {
-            // Создание директории для субтитров
-            await mkdirAsync(folderSubtitlesPath, { recursive: true });
-            console.log(`Directory created: ${folderSubtitlesPath}`);
+            await unlinkAsync(path.join(folderSubtitlesPath, subFileName));
+            console.log(`Deleted original subtitle file: ${subFileName}`);
           } catch (error) {
-            console.error(`Error creating directory: ${error}`);
-            reject(`Error creating directory: ${error.message}`);
-            return;
+            console.error(`Error deleting original subtitle file: ${error}`);
           }
+        });
 
-          const extractSubtitles = (subtitle, subFileName) => {
-            return new Promise<void>((resolve, reject) => {
-              const extractSubsCommand = [
-                '-i',
-                videoTmpPath,
-                '-map',
-                `0:s:${subtitle.index}`,
-                '-c:s',
-                'srt',
-                path.join(folderSubtitlesPath, subFileName),
-              ];
+        await Promise.all(promises);
+      };
 
-              const extractProcess = spawn('ffmpeg', extractSubsCommand);
+      await processSubtitles();
 
-              extractProcess.on('close', (code) => {
-                if (code !== 0) {
-                  console.error(`ffmpeg extract stderr: ${stderr}`);
-                  reject(new Error(`ffmpeg extract exited with code ${code}`));
-                } else {
-                  resolve();
-                }
-              });
-            });
-          };
+      console.log('Subtitles extracted and converted successfully');
 
-          const convertSubtitles = (subFileName, vttFileName) => {
-            return new Promise<void>((resolve, reject) => {
-              const convertSubsCommand = [
-                '-i',
-                path.join(folderSubtitlesPath, subFileName),
-                path.join(folderSubtitlesPath, vttFileName),
-              ];
-
-              const convertProcess = spawn('ffmpeg', convertSubsCommand);
-
-              convertProcess.on('close', (code) => {
-                if (code !== 0) {
-                  console.error(`ffmpeg convert stderr: ${stderr}`);
-                  reject(new Error(`ffmpeg convert exited with code ${code}`));
-                } else {
-                  resolve();
-                }
-              });
-            });
-          };
-
-          const processSubtitles = async () => {
-            const promises = subtitlesInfo.map(async (subtitle) => {
-              const subExt = subsExtByCodec[subtitle.codec_name];
-              const subFileName = `${subtitle.createdName}.${subExt}`;
-              const vttFileName = `${subtitle.createdName}.vtt`;
-
-              await extractSubtitles(subtitle, subFileName);
-              await convertSubtitles(subFileName, vttFileName);
-
-              // Удаление исходного файла субтитров после конвертации
-              try {
-                await unlinkAsync(path.join(folderSubtitlesPath, subFileName));
-                console.log(`Deleted original subtitle file: ${subFileName}`);
-              } catch (error) {
-                console.error(`Error deleting original subtitle file: ${error}`);
-              }
-            });
-
-            await Promise.all(promises);
-          };
-
-          await processSubtitles();
-
-          console.log('Subtitles extracted and converted successfully');
-
-          resolve(subtitlesInfo);
-        } catch (error) {
-          reject(`Failed to parse ffprobe output: ${error.message}`);
-        }
-      });
-    });
+      return subtitlesInfo;
+    } catch (error) {
+      console.error(`Failed to process subtitles: ${error.message}`);
+      throw new Error(`Failed to process subtitles: ${error.message}`);
+    }
   }
 }

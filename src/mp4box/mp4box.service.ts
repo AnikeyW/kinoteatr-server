@@ -4,17 +4,13 @@ import * as path from 'path';
 
 @Injectable()
 export class Mp4boxService {
-  async toMpdFromHls(episodeName: string): Promise<string> {
+  async toMpdFromHls(
+    episodeName: string,
+    hlsPathFromStatic: string,
+  ): Promise<{ hlsPathFromStatic: string; dashPathFromStatic: string }> {
     return new Promise((resolve, reject) => {
-      const m3u8ManifestPath = path.join(
-        __dirname,
-        '..',
-        '..',
-        'static',
-        'video',
-        episodeName,
-        'master.m3u8',
-      );
+      const m3u8ManifestPath = path.join(__dirname, '..', '..', 'static', hlsPathFromStatic);
+
       const mpdManifestPath = path.join(
         __dirname,
         '..',
@@ -24,6 +20,7 @@ export class Mp4boxService {
         episodeName,
         'master.mpd',
       );
+      const dashPathFromStatic = path.join('video', episodeName, 'master.mpd');
 
       const command = `MP4Box -mpd ${m3u8ManifestPath} -out ${mpdManifestPath}`;
 
@@ -35,7 +32,7 @@ export class Mp4boxService {
         }
         console.log(`stdout: ${stdout}`);
         console.error(`stderr: ${stderr}`);
-        resolve(stdout);
+        resolve({ hlsPathFromStatic, dashPathFromStatic });
       });
     });
   }

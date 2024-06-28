@@ -1,11 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { spawn } from 'child_process';
 import { IAudioInfoTrack } from '../ffmpeg/types';
+import { IExtractedSubtitles } from '../subtitles/extractedSubtitlesType';
+
+export interface IVideoInfo {
+  duration: number;
+  resolution: { width: number; height: number };
+  audioTracks: IAudioInfoTrack[];
+  subtitlesInfo: IExtractedSubtitles[];
+}
 
 @Injectable()
 export class MediainfoService {
   async getVideoInfo(videoPath: string) {
-    return new Promise<any>((resolve, reject) => {
+    return new Promise<IVideoInfo>((resolve, reject) => {
       const mediainfo = spawn('mediainfo', ['--Output=JSON', videoPath]);
 
       let stdout = '';
@@ -31,7 +39,7 @@ export class MediainfoService {
             mediainfoJson.media.track.filter((track: any) => track['@type'] === 'Text') || [];
           const videoInfo = videoInfoArray[0];
 
-          const audioTracks: IAudioInfoTrack[] = audioInfoArray.map((audio, index) => ({
+          const audioTracks = audioInfoArray.map((audio, index) => ({
             index: index,
             bitrate: audio.BitRate,
             title: audio.Title,
@@ -54,13 +62,6 @@ export class MediainfoService {
             language: subtitle.Language || 'und',
             title: subtitle.Title || undefined,
           }));
-          // index: number;
-          // codec_name: 'subrip' | 'ass';
-          // codec_type: string;
-          // tags: {
-          //   language: string;
-          //   title?: string;
-          // };
 
           const fullInfo = {
             duration: Math.round(parseFloat(videoInfo.Duration)),
