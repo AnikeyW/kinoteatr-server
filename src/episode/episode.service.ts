@@ -44,6 +44,7 @@ export class EpisodeService {
         videoTmpPath,
         videoInfo.duration,
         episodeName,
+        // videoInfo.resolution,
       );
 
       const episode = await this.prismaService.episode.create({
@@ -52,7 +53,9 @@ export class EpisodeService {
           description: dto.description,
           order: Number(dto.order),
           skipRepeat: Number(dto.skipRepeat),
+          skipRepeatEnd: Number(dto.skipRepeatEnd),
           skipIntro: Number(dto.skipIntro),
+          skipIntroEnd: Number(dto.skipIntroEnd),
           skipCredits: Number(dto.skipCredits),
           seasonId: Number(dto.seasonId),
           duration: videoInfo.duration,
@@ -62,6 +65,8 @@ export class EpisodeService {
           thumbnails: thumbnailsPaths,
           isProcessing: true,
           releaseDate: new Date(dto.releaseDate),
+          width: videoInfo.resolution.width,
+          height: videoInfo.resolution.height,
         },
       });
 
@@ -233,7 +238,6 @@ export class EpisodeService {
       const episodeName = episode.poster.replace(/\\/g, '/').split('/')[1].split('.')[0];
 
       const staticPath = path.join(__dirname, '..', '..', 'static');
-      console.log(staticPath);
 
       // Удалить thumbnails
       const thumbnailsDir = path.join(staticPath, 'thumbnails', episodeName);

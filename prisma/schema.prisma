@@ -33,24 +33,28 @@ model Season {
 }
 
 model Episode {
-  id           Int         @id @default(autoincrement())
-  title        String
-  description  String
-  order        Int
-  skipRepeat   Int?        @map("skip_repeat")
-  skipIntro    Int?        @map("skip_intro")
-  skipCredits  Int?        @map("skip_credits")
-  season       Season      @relation("SeasonToEpisode", fields: [seasonId], references: [id])
-  seasonId     Int         @map("season_id")
-  views        Int         @default(0)
-  duration     Int
-  poster       String
-  thumbnails   String[]
-  isProcessing Boolean     @map("is_processing")
-  srcHls       String      @map("src_hls")
-  srcDash      String      @map("src_dash")
-  releaseDate  DateTime    @map("release_date")
-  subtitles    Subtitles[] @relation("EpisodeToSubtitles")
+  id            Int         @id @default(autoincrement())
+  title         String
+  description   String
+  order         Int
+  skipRepeat    Int?        @map("skip_repeat")
+  skipRepeatEnd Int?        @map("skip_repeat_end")
+  skipIntro     Int?        @map("skip_intro")
+  skipIntroEnd  Int?        @map("skip_intro_end")
+  skipCredits   Int?        @map("skip_credits")
+  season        Season      @relation("SeasonToEpisode", fields: [seasonId], references: [id])
+  seasonId      Int         @map("season_id")
+  views         Int         @default(0)
+  duration      Int
+  poster        String
+  thumbnails    String[]
+  isProcessing  Boolean     @map("is_processing")
+  srcHls        String      @map("src_hls")
+  srcDash       String      @map("src_dash")
+  releaseDate   DateTime    @map("release_date")
+  subtitles     Subtitles[] @relation("EpisodeToSubtitles")
+  width         Int         @default(1920)
+  height        Int         @default(1080)
 }
 
 model Admin {
