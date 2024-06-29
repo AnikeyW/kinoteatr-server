@@ -44,7 +44,6 @@ export class EpisodeService {
         videoTmpPath,
         videoInfo.duration,
         episodeName,
-        // videoInfo.resolution,
       );
 
       const episode = await this.prismaService.episode.create({
@@ -179,7 +178,11 @@ export class EpisodeService {
         releaseDate: new Date(dto.releaseDate),
         skipCredits: dto.skipCredits ? Number(dto.skipCredits) : null,
         skipIntro: dto.skipIntro ? Number(dto.skipIntro) : null,
+        skipIntroEnd: dto.skipIntro ? Number(dto.skipIntroEnd) : null,
         skipRepeat: dto.skipRepeat ? Number(dto.skipRepeat) : null,
+        skipRepeatEnd: dto.skipRepeat ? Number(dto.skipRepeatEnd) : null,
+        width: Number(dto.width),
+        height: Number(dto.height),
       },
       include: { subtitles: true },
     });

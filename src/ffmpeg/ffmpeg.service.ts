@@ -192,74 +192,10 @@ export class FfmpegService {
     }
   }
 
-  // async extractThumbnails(
-  //   videoTmpPath: string,
-  //   videoDuration: number,
-  //   episodeName: string,
-  //   videoResolution: { width: number; height: number },
-  // ): Promise<string[]> {
-  //   const THUMB_QUANTITY = 20;
-  //
-  //   function secondsToHms(seconds: number): string {
-  //     const hours = Math.floor(seconds / 3600);
-  //     const minutes = Math.floor((seconds % 3600) / 60);
-  //     const secs = seconds % 60;
-  //
-  //     const formattedHours = String(hours).padStart(2, '0');
-  //     const formattedMinutes = String(minutes).padStart(2, '0');
-  //     const formattedSeconds = String(secs).padStart(2, '0');
-  //
-  //     return `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
-  //   }
-  //
-  //   // Путь к папке для миниатюр относительно текущего модуля
-  //   const folderThumbnailsPath = path.join(
-  //     __dirname,
-  //     '..',
-  //     '..',
-  //     'static',
-  //     'thumbnails',
-  //     episodeName,
-  //   );
-  //
-  //   try {
-  //     // Создание директории для миниатюр
-  //     await mkdirAsync(folderThumbnailsPath, { recursive: true });
-  //     console.log(`Directory created: ${folderThumbnailsPath}`);
-  //
-  //     const thumbnailPromises = [];
-  //
-  //     for (let i = 1; i <= THUMB_QUANTITY; i++) {
-  //       const step = Math.floor(videoDuration / (THUMB_QUANTITY + 1));
-  //       const time = secondsToHms(step * i);
-  //       console.log(`Creating thumbnail for time: ${time}`);
-  //
-  //       // const command = `ffmpeg -ss ${time} -i ${videoTmpPath} -frames:v 1 -vf "scale=1080:-1" ${folderThumbnailsPath}/thumbnail_${i}.webp`;
-  //       // const command = `ffmpeg -ss ${time} -i ${videoTmpPath} -frames:v 1 -vf "crop=in_w:in_h*(1080/in_w),scale=1080:-1" ${folderThumbnailsPath}/thumbnail_${i}.webp`;
-  //       const command = `ffmpeg -ss ${time} -i ${videoTmpPath} -frames:v 1 -vf "scale='if(gt(a,2),1080,-1)':'if(gt(a,2),-1,1080)'" ${folderThumbnailsPath}/thumbnail_${i}.webp`;
-  //       thumbnailPromises.push(execPromise(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }));
-  //     }
-  //
-  //     await Promise.all(thumbnailPromises);
-  //
-  //     const thumbnails = [];
-  //     for (let i = 1; i <= THUMB_QUANTITY; i++) {
-  //       thumbnails.push(path.join('thumbnails', episodeName, `thumbnail_${i}.webp`));
-  //     }
-  //
-  //     console.log('Thumbnails created successfully');
-  //     return thumbnails;
-  //   } catch (error) {
-  //     console.error(`Error creating thumbnails: ${error}`);
-  //     throw new Error(`Error creating thumbnails: ${error.message}`);
-  //   }
-  // }
-
   async extractThumbnails(
     videoTmpPath: string,
     videoDuration: number,
     episodeName: string,
-    // videoResolution: { width: number; height: number },
   ): Promise<string[]> {
     const THUMB_QUANTITY = 20;
 
@@ -297,9 +233,6 @@ export class FfmpegService {
         const time = secondsToHms(step * i);
         console.log(`Creating thumbnail for time: ${time}`);
 
-        // const scaleFilter = `scale=1080:${Math.round((1080 / videoResolution.width) * videoResolution.height)}`;
-
-        // const command = `ffmpeg -ss ${time} -i ${videoTmpPath} -frames:v 1 -vf "${scaleFilter}" ${folderThumbnailsPath}/thumbnail_${i}.webp`;
         const command = `ffmpeg -ss ${secondsToHms(step * i)} -i ${videoTmpPath} -frames:v 1 -vf "scale=1080:-1" ${folderThumbnailsPath}/thumbnail_${i}.webp`;
 
         thumbnailPromises.push(execPromise(command, { maxBuffer: 1024 * 1024 * 1024 * 5 }));
