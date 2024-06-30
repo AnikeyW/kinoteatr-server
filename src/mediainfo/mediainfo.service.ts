@@ -14,7 +14,9 @@ export interface IVideoInfo {
 export class MediainfoService {
   async getVideoInfo(videoPath: string) {
     return new Promise<IVideoInfo>((resolve, reject) => {
-      const mediainfo = spawn('mediainfo', ['--Output=JSON', videoPath]);
+      // const mediainfo = spawn('mediainfo', ['--Output=JSON', videoPath]);
+      const pathToMediainfo = 'C:\\Program Files\\MediaInfo_CLI_24.05_Windows_x64\\mediainfo.exe';
+      const mediainfo = spawn(pathToMediainfo, ['--Output=JSON', videoPath]);
 
       let stdout = '';
       let stderr = '';
