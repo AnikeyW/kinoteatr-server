@@ -6,6 +6,7 @@ import { FileService } from '../file/file.service';
 import { FfmpegService } from '../ffmpeg/ffmpeg.service';
 import { Mp4boxService } from '../mp4box/mp4box.service';
 import { SubtitlesService } from '../subtitles/subtitles.service';
+import { MediainfoService } from '../mediainfo/mediainfo.service';
 
 @Module({
   controllers: [EpisodeController],
@@ -16,6 +17,7 @@ import { SubtitlesService } from '../subtitles/subtitles.service';
     FfmpegService,
     Mp4boxService,
     SubtitlesService,
+    MediainfoService,
   ],
 })
 export class EpisodeModule {}

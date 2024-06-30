@@ -1,6 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import * as fs from 'fs';
-import { promisify } from 'util';
 import { CreateEpisodeDto } from './dto/create-episode.dto';
 import { Episode, Subtitles } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,8 +11,7 @@ import { FileService } from '../file/file.service';
 import { Mp4boxService } from '../mp4box/mp4box.service';
 import { EditEpisodeDto, IExistSubtitles } from './dto/edit-episode.dto';
 import { SubtitlesService } from '../subtitles/subtitles.service';
-
-const mkdirAsync = promisify(fs.mkdir);
+import { MediainfoService } from '../mediainfo/mediainfo.service';
 
 @Injectable()
 export class EpisodeService {
@@ -23,13 +21,10 @@ export class EpisodeService {
     private mp4boxService: Mp4boxService,
     private fileService: FileService,
     private subtitlesService: SubtitlesService,
+    private mediainfoService: MediainfoService,
   ) {}
 
-  async createEpisode(
-    videoTmpPath: string,
-    subtitlesTmpList: { path: string }[],
-    dto: CreateEpisodeDto,
-  ): Promise<Episode> {
+  async createEpisode(videoTmpPath: string, dto: CreateEpisodeDto) {
     const isExistOrderNumber = await this.prismaService.episode.findFirst({
       where: { order: Number(dto.order), seasonId: Number(dto.seasonId) },
     });
@@ -43,11 +38,11 @@ export class EpisodeService {
     try {
       const episodeName = uuid.v4();
 
-      const videoDuration = await this.ffmpegService.getVideoDuration(videoTmpPath);
+      const videoInfo = await this.mediainfoService.getVideoInfo(videoTmpPath);
 
       const thumbnailsPaths = await this.ffmpegService.extractThumbnails(
         videoTmpPath,
-        videoDuration,
+        videoInfo.duration,
         episodeName,
       );
 
@@ -57,102 +52,43 @@ export class EpisodeService {
           description: dto.description,
           order: Number(dto.order),
           skipRepeat: Number(dto.skipRepeat),
+          skipRepeatEnd: Number(dto.skipRepeatEnd),
           skipIntro: Number(dto.skipIntro),
+          skipIntroEnd: Number(dto.skipIntroEnd),
           skipCredits: Number(dto.skipCredits),
           seasonId: Number(dto.seasonId),
-          duration: videoDuration,
+          duration: videoInfo.duration,
           srcHls: '',
           srcDash: '',
           poster: thumbnailsPaths[10],
           thumbnails: thumbnailsPaths,
           isProcessing: true,
           releaseDate: new Date(dto.releaseDate),
+          width: videoInfo.resolution.width,
+          height: videoInfo.resolution.height,
         },
       });
 
-      if (subtitlesTmpList.length > 0) {
-        const subtitlesStaticPath = path.join(
-          __dirname,
-          '..',
-          '..',
-          'static',
-          'subtitles',
-          episodeName,
-        );
-
-        const saveSubtitles = async (subtitlesTmpList) => {
-          for (const subtitleTmp of subtitlesTmpList) {
-            const subPath = this.fileService.moveFileToStatic(
-              subtitleTmp.path,
-              subtitlesStaticPath,
-            );
-            await this.prismaService.subtitles.create({
-              data: { src: subPath, episodeId: episode.id },
-            });
-          }
-        };
-
-        await saveSubtitles(subtitlesTmpList);
-      }
-
-      const uploadedVideoResolution = await this.ffmpegService.getVideoResolution(videoTmpPath);
-
-      const aspectRatio = (uploadedVideoResolution.width / uploadedVideoResolution.height).toFixed(
-        2,
+      const subtitlesList = await this.ffmpegService.extractSubtitles(
+        videoTmpPath,
+        episodeName,
+        videoInfo,
       );
 
-      const resolutions_16_9 = [
-        '426x240', // 240p
-        '640x360', // 360p
-        '854x480', // 480p
-        '1280x720', // 720p
-        '1920x1080', // 1080p
-        '2560x1440', // 1440p (2K)
-        '3840x2160', // 2160p (4K)
-        '7680x4320', // 4320p (8K)
-      ];
-
-      const resolutions_2_1 = [
-        '426x213',
-        '640x320',
-        '854x427',
-        '1280x640',
-        '1920x960',
-        '2560x1280',
-        '3840x1920',
-        '7680x3840',
-      ];
-
-      const resolutionsByAspectRatio = {
-        '1.78': resolutions_16_9,
-        '1.77': resolutions_16_9,
-        '2.00': resolutions_2_1,
-      };
-
-      const resolutions = resolutionsByAspectRatio[aspectRatio].filter(
-        (r) => Number(r.split('x')[0]) <= uploadedVideoResolution.width,
-      );
-
-      const hlsPath = path.join('video', episodeName, 'master.m3u8');
-      const dashPath = path.join('video', episodeName, 'master.mpd');
-
-      await this.createEpisodeFolder(episodeName);
+      await this.subtitlesService.saveSubtitles(subtitlesList, episode.id, episodeName);
 
       this.ffmpegService
-        .toHlsUsingVideoCard(videoTmpPath, episodeName, resolutions)
-        .then(() => {
-          console.log('Все потоки ffmpeg завершены.');
+        .toHlsUsingVideoCard(videoTmpPath, episodeName, videoInfo)
+        .then((hlsPathFromStatic) => {
+          return this.mp4boxService.toMpdFromHls(episodeName, hlsPathFromStatic);
         })
-        .then(() => {
-          this.mp4boxService.toMpdFromHls(episodeName);
-        })
-        .then(async () => {
+        .then(async (data) => {
           await this.prismaService.episode.update({
             where: { id: episode.id },
             data: {
               isProcessing: false,
-              srcHls: hlsPath,
-              srcDash: dashPath,
+              srcHls: data.hlsPathFromStatic,
+              srcDash: data.dashPathFromStatic,
             },
           });
         })
@@ -242,7 +178,11 @@ export class EpisodeService {
         releaseDate: new Date(dto.releaseDate),
         skipCredits: dto.skipCredits ? Number(dto.skipCredits) : null,
         skipIntro: dto.skipIntro ? Number(dto.skipIntro) : null,
+        skipIntroEnd: dto.skipIntro ? Number(dto.skipIntroEnd) : null,
         skipRepeat: dto.skipRepeat ? Number(dto.skipRepeat) : null,
+        skipRepeatEnd: dto.skipRepeat ? Number(dto.skipRepeatEnd) : null,
+        width: Number(dto.width),
+        height: Number(dto.height),
       },
       include: { subtitles: true },
     });
@@ -301,7 +241,6 @@ export class EpisodeService {
       const episodeName = episode.poster.replace(/\\/g, '/').split('/')[1].split('.')[0];
 
       const staticPath = path.join(__dirname, '..', '..', 'static');
-      console.log(staticPath);
 
       // Удалить thumbnails
       const thumbnailsDir = path.join(staticPath, 'thumbnails', episodeName);
@@ -330,11 +269,6 @@ export class EpisodeService {
     } catch (e) {
       throw new HttpException('Ошибка удаления', HttpStatus.INTERNAL_SERVER_ERROR);
     }
-  }
-
-  private async createEpisodeFolder(episodeName: string) {
-    const folderVideoPath = path.join(__dirname, '..', '..', 'static', 'video', episodeName);
-    await mkdirAsync(folderVideoPath, { recursive: true });
   }
 
   private async deleteTemporaryFiles(filesToDelete: string[]): Promise<void> {
