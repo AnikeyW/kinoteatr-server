@@ -34,7 +34,6 @@
     "cookie-parser": "^1.4.6",
     "cross-env": "^7.0.3",
     "fs-extra": "^11.2.0",
-    "mediainfo.js": "^0.3.1",
     "mime-types": "^2.1.35",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
