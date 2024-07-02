@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { spawn } from 'child_process';
 import { IAudioInfoTrack } from '../ffmpeg/types';
 import { IExtractedSubtitles } from '../subtitles/extractedSubtitlesType';
+import MediaInfoFactory from 'mediainfo.js';
+import * as fs from 'fs-extra';
 
 export interface IVideoInfo {
   duration: number;
@@ -12,72 +13,136 @@ export interface IVideoInfo {
 
 @Injectable()
 export class MediainfoService {
-  async getVideoInfo(videoPath: string) {
-    return new Promise<IVideoInfo>((resolve, reject) => {
-      // const mediainfo = spawn('mediainfo', ['--Output=JSON', videoPath]);
-      const pathToMediainfo = 'C:\\Program Files\\MediaInfo_CLI_24.05_Windows_x64\\mediainfo.exe';
-      const mediainfo = spawn(pathToMediainfo, ['--Output=JSON', videoPath]);
+  async getVideoInfo(videoPath: string): Promise<IVideoInfo> {
+    const fileSize = (await fs.stat(videoPath)).size;
 
-      let stdout = '';
-      let stderr = '';
+    const mediainfo = await MediaInfoFactory();
 
-      mediainfo.stdout.on('data', (data) => {
-        stdout += data.toString();
+    const getMediaInfo = () =>
+      new Promise<any>((resolve, reject) => {
+        mediainfo
+          .analyzeData(
+            () => fileSize,
+            (offset, length) =>
+              fs.readFileSync(videoPath, {
+                encoding: null,
+                start: offset,
+                end: offset + length - 1,
+              }),
+          )
+          .then(resolve)
+          .catch(reject);
       });
 
-      mediainfo.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
+    const result = await getMediaInfo();
 
-      mediainfo.on('close', (code) => {
-        if (code === 0) {
-          const mediainfoJson = JSON.parse(stdout);
-          const videoInfoArray = mediainfoJson.media.track.filter(
-            (track: any) => track['@type'] === 'Video',
-          );
-          const audioInfoArray =
-            mediainfoJson.media.track.filter((track: any) => track['@type'] === 'Audio') || [];
-          const subtitlesInfoArray =
-            mediainfoJson.media.track.filter((track: any) => track['@type'] === 'Text') || [];
-          const videoInfo = videoInfoArray[0];
+    if (!result || !result.media || !result.media.track) {
+      throw new Error('Invalid media info result');
+    }
 
-          const audioTracks = audioInfoArray.map((audio, index) => ({
-            index: index,
-            bitrate: audio.BitRate,
-            title: audio.Title,
-            language: audio.Language,
-            default: audio.Default,
-            format: audio.Format,
-            channels: audio.Channels,
-            channelPositions: audio.ChannelPositions,
-            codec: audio.CodecID,
-          }));
+    const videoInfoArray = result.media.track.filter((track: any) => track['@type'] === 'Video');
+    const audioInfoArray =
+      result.media.track.filter((track: any) => track['@type'] === 'Audio') || [];
+    const subtitlesInfoArray =
+      result.media.track.filter((track: any) => track['@type'] === 'Text') || [];
+    const videoInfo = videoInfoArray[0];
 
-          const subtitlesInfo = subtitlesInfoArray.map((subtitle, index) => ({
-            index: index,
-            codec:
-              subtitle.Format === 'SubRip'
-                ? 'subrip'
-                : subtitle.CodecID === 'tx3g'
-                  ? 'mov_text'
-                  : 'ass',
-            language: subtitle.Language || 'und',
-            title: subtitle.Title || undefined,
-          }));
+    const audioTracks = audioInfoArray.map((audio: any, index: number) => ({
+      index: index,
+      bitrate: audio.BitRate,
+      title: audio.Title,
+      language: audio.Language,
+      default: audio.Default,
+      format: audio.Format,
+      channels: audio.Channels,
+      channelPositions: audio.ChannelPositions,
+      codec: audio.CodecID,
+    }));
 
-          const fullInfo = {
-            duration: Math.round(parseFloat(videoInfo.Duration)),
-            resolution: { width: parseInt(videoInfo.Width), height: parseInt(videoInfo.Height) },
-            audioTracks: audioTracks,
-            subtitlesInfo: subtitlesInfo,
-          };
-          resolve(fullInfo);
-        } else {
-          reject(new Error(`mediainfo exited with code ${code}: ${stderr}`));
-        }
-      });
-    });
+    const subtitlesInfo = subtitlesInfoArray.map((subtitle: any, index: number) => ({
+      index: index,
+      codec:
+        subtitle.Format === 'SubRip' ? 'subrip' : subtitle.CodecID === 'tx3g' ? 'mov_text' : 'ass',
+      language: subtitle.Language || 'und',
+      title: subtitle.Title || undefined,
+    }));
+
+    const fullInfo = {
+      duration: Math.round(parseFloat(videoInfo.Duration)),
+      resolution: { width: parseInt(videoInfo.Width), height: parseInt(videoInfo.Height) },
+      audioTracks: audioTracks,
+      subtitlesInfo: subtitlesInfo,
+    };
+
+    return fullInfo;
   }
+
+  // async getVideoInfo(videoPath: string) {
+  //   return new Promise<IVideoInfo>((resolve, reject) => {
+  //     // const mediainfo = spawn('mediainfo', ['--Output=JSON', videoPath]);
+  //     const pathToMediainfo = 'C:\\Program Files\\MediaInfo_CLI_24.05_Windows_x64\\mediainfo.exe';
+  //     const mediainfo = spawn(pathToMediainfo, ['--Output=JSON', videoPath]);
+  //
+  //     let stdout = '';
+  //     let stderr = '';
+  //
+  //     mediainfo.stdout.on('data', (data) => {
+  //       stdout += data.toString();
+  //     });
+  //
+  //     mediainfo.stderr.on('data', (data) => {
+  //       stderr += data.toString();
+  //     });
+  //
+  //     mediainfo.on('close', (code) => {
+  //       if (code === 0) {
+  //         const mediainfoJson = JSON.parse(stdout);
+  //         const videoInfoArray = mediainfoJson.media.track.filter(
+  //           (track: any) => track['@type'] === 'Video',
+  //         );
+  //         const audioInfoArray =
+  //           mediainfoJson.media.track.filter((track: any) => track['@type'] === 'Audio') || [];
+  //         const subtitlesInfoArray =
+  //           mediainfoJson.media.track.filter((track: any) => track['@type'] === 'Text') || [];
+  //         const videoInfo = videoInfoArray[0];
+  //
+  //         const audioTracks = audioInfoArray.map((audio, index) => ({
+  //           index: index,
+  //           bitrate: audio.BitRate,
+  //           title: audio.Title,
+  //           language: audio.Language,
+  //           default: audio.Default,
+  //           format: audio.Format,
+  //           channels: audio.Channels,
+  //           channelPositions: audio.ChannelPositions,
+  //           codec: audio.CodecID,
+  //         }));
+  //
+  //         const subtitlesInfo = subtitlesInfoArray.map((subtitle, index) => ({
+  //           index: index,
+  //           codec:
+  //             subtitle.Format === 'SubRip'
+  //               ? 'subrip'
+  //               : subtitle.CodecID === 'tx3g'
+  //                 ? 'mov_text'
+  //                 : 'ass',
+  //           language: subtitle.Language || 'und',
+  //           title: subtitle.Title || undefined,
+  //         }));
+  //
+  //         const fullInfo = {
+  //           duration: Math.round(parseFloat(videoInfo.Duration)),
+  //           resolution: { width: parseInt(videoInfo.Width), height: parseInt(videoInfo.Height) },
+  //           audioTracks: audioTracks,
+  //           subtitlesInfo: subtitlesInfo,
+  //         };
+  //         resolve(fullInfo);
+  //       } else {
+  //         reject(new Error(`mediainfo exited with code ${code}: ${stderr}`));
+  //       }
+  //     });
+  //   });
+  // }
 }
 // episodservis video info {
 //   "creatingLibrary":{"name":"MediaInfoLib","version":"24.05","url":"https://mediaarea.net/MediaInfo"},
