@@ -54,17 +54,19 @@ export class MediainfoService {
               codec: audio.CodecID,
             }));
 
-            const subtitlesInfo = subtitlesInfoArray.map((subtitle, index) => ({
-              index: index,
-              codec:
-                subtitle.Format === 'SubRip'
-                  ? 'subrip'
-                  : subtitle.CodecID === 'tx3g'
-                    ? 'mov_text'
-                    : 'ass',
-              language: subtitle.Language || 'und',
-              title: subtitle.Title || undefined,
-            }));
+            const subtitlesInfo = subtitlesInfoArray
+              .filter((sub) => !isNaN(Number(sub.StreamOrder)))
+              .map((subtitle) => ({
+                index: Number(subtitle.StreamOrder),
+                codec:
+                  subtitle.Format === 'SubRip'
+                    ? 'subrip'
+                    : subtitle.CodecID === 'tx3g'
+                      ? 'mov_text'
+                      : 'ass',
+                language: subtitle.Language || '__',
+                title: subtitle.Title || undefined,
+              }));
 
             const fullInfo = {
               duration: Math.round(parseFloat(videoInfo.Duration)),

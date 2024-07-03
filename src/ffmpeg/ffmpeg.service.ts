@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import { ExtractedSubtitlesWithCreatedName } from '../subtitles/extractedSubtitlesType';
 import { IAudioInfoTrack } from './types';
 import { IVideoInfo } from '../mediainfo/mediainfo.service';
+import { GuidesService } from '../guides/guides.service';
 
 const execPromise = promisify(exec);
 const mkdirAsync = promisify(fs.mkdir);
@@ -13,6 +14,7 @@ const unlinkAsync = promisify(fs.unlink);
 
 @Injectable()
 export class FfmpegService {
+  constructor(private guidesService: GuidesService) {}
   async toHlsUsingVideoCard(
     videoTmpPath: string,
     episodeName: string,
@@ -259,11 +261,19 @@ export class FfmpegService {
     videoInfo: IVideoInfo,
   ): Promise<ExtractedSubtitlesWithCreatedName[]> {
     try {
-      const subtitlesInfo = videoInfo.subtitlesInfo.map((subtitle, idx) => ({
-        ...subtitle,
-        index: idx,
-        createdName: `(${subtitle.language})_${subtitle.title || idx + 1}`,
-      }));
+      const removeBrackets = (str) => str.replace(/[\[\]]/g, '');
+
+      const subtitlesInfo = videoInfo.subtitlesInfo.map((subtitle) => {
+        const language = subtitle.language || 'und';
+        const title = subtitle.title
+          ? removeBrackets(subtitle.title)
+          : this.guidesService.getLanguageNameByLangCode(language);
+
+        return {
+          ...subtitle,
+          createdName: `(${language})_${title}`,
+        };
+      });
 
       const subsExtByCodec = {
         subrip: 'srt',
@@ -295,9 +305,9 @@ export class FfmpegService {
             '-i',
             videoTmpPath,
             '-map',
-            `0:s:${subtitle.index}`,
+            `0:${subtitle.index}?`,
             '-c:s',
-            'srt',
+            subsExtByCodec[subtitle.codec],
             path.join(folderSubtitlesPath, subFileName),
           ];
 
