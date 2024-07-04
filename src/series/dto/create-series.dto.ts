@@ -1,5 +1,6 @@
 export class CreateSeriesDto {
   readonly title: string;
+  readonly slug: string;
   readonly description: string;
   readonly releaseYear: string;
   readonly rateKinopoisk: string;

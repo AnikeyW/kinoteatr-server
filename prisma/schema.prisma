@@ -10,6 +10,7 @@ datasource db {
 model Series {
   id            Int         @id @default(autoincrement())
   title         String
+  slug          String      @default("slug default")
   description   String
   releaseYear   Int         @map("release_year")
   poster        String

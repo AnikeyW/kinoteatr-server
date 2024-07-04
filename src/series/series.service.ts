@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSeriesDto } from './dto/create-series.dto';
 import { Series } from '@prisma/client';
@@ -13,6 +13,14 @@ export class SeriesService {
   ) {}
 
   async createSeries(poster: File, dto: CreateSeriesDto): Promise<Series> {
+    const existSeriesWithSlug = await this.prismaService.series.findFirst({
+      where: { slug: dto.slug },
+    });
+
+    if (existSeriesWithSlug) {
+      throw new HttpException('Такой slug занят', HttpStatus.BAD_REQUEST);
+    }
+
     const posterPath = await this.fileService.createFile(FileTypes.IMAGE, poster);
 
     const countriesList = JSON.parse(dto.countries).map((country) => ({ name: country }));
@@ -40,6 +48,14 @@ export class SeriesService {
   }
 
   async editSeriesById(dto: EditSeriesDto, poster: File | null, seriesId: number): Promise<Series> {
+    const existSeriesWithSlug = await this.prismaService.series.findFirst({
+      where: { slug: dto.slug },
+    });
+
+    if (existSeriesWithSlug) {
+      throw new HttpException('Такой slug занят', HttpStatus.BAD_REQUEST);
+    }
+
     const existingSeries = await this.prismaService.series.findUnique({
       where: { id: seriesId },
       include: { countries: true, genres: true },
@@ -72,6 +88,7 @@ export class SeriesService {
         where: { id: seriesId },
         data: {
           title: dtoResult.title,
+          slug: dtoResult.slug,
           description: dtoResult.description,
           releaseYear: Number(dtoResult.releaseYear),
           rateKinopoisk: Number(dtoResult.rateKinopoisk),
