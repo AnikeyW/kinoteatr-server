@@ -44,7 +44,7 @@ export class SeasonController {
   }
 
   @Get(':order')
-  getByOrder(@Param('order') order, @Query('series_id') seriesId) {
-    return this.seasonService.getByOrder(Number(seriesId), Number(order));
+  getByOrder(@Param('order') order, @Query('series_slug') seriesSlug) {
+    return this.seasonService.getByOrder(seriesSlug, Number(order));
   }
 }

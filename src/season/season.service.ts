@@ -84,9 +84,14 @@ export class SeasonService {
     return season;
   }
 
-  async getByOrder(seriesId: number, order: number): Promise<Season> {
+  async getByOrder(seriesSlug: string, order: number): Promise<Season> {
+    const series = await this.prismaService.series.findFirst({ where: { slug: seriesSlug } });
+    if (!series) {
+      throw new HttpException('Сериал с таким slug не найден', HttpStatus.NOT_FOUND);
+    }
+
     const season = await this.prismaService.season.findFirst({
-      where: { seriesId: seriesId, order: order },
+      where: { seriesId: series.id, order: order },
     });
 
     if (!season) {
@@ -94,7 +99,7 @@ export class SeasonService {
     }
 
     const seasonWithEpisodes = await this.prismaService.season.findUnique({
-      where: { seriesId: seriesId, id: season.id },
+      where: { seriesId: series.id, id: season.id },
       include: {
         episodes: {
           where: { seasonId: season.id },

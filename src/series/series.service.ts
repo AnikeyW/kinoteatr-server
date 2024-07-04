@@ -161,6 +161,32 @@ export class SeriesService {
     };
   }
 
+  async getBySlug(slug: string) {
+    const series = await this.prismaService.series.findFirst({
+      where: { slug: slug },
+      include: {
+        seasons: {
+          orderBy: { order: 'asc' },
+        },
+        genres: true,
+        countries: true,
+      },
+    });
+
+    if (!series) {
+      throw new Error('Series not found');
+    }
+
+    const countries = series.countries.map((c) => c.name);
+    const genres = series.genres.map((g) => g.name);
+
+    return {
+      ...series,
+      countries,
+      genres,
+    };
+  }
+
   async getManySeries(skip: number, take: number): Promise<Series[]> {
     return this.prismaService.series.findMany({ skip, take });
   }

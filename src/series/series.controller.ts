@@ -43,6 +43,11 @@ export class SeriesController {
     return this.seriesService.getById(Number(seriesId));
   }
 
+  @Get('bySlug/:slug')
+  getBySlug(@Param('slug') slug) {
+    return this.seriesService.getBySlug(slug);
+  }
+
   @Get()
   getManySeries(@Query() query: { skip: string; take: string }) {
     const { skip, take } = query;

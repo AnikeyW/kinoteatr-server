@@ -12,6 +12,7 @@ import { Mp4boxService } from '../mp4box/mp4box.service';
 import { EditEpisodeDto, IExistSubtitles } from './dto/edit-episode.dto';
 import { SubtitlesService } from '../subtitles/subtitles.service';
 import { MediainfoService } from '../mediainfo/mediainfo.service';
+import { SeasonService } from '../season/season.service';
 
 @Injectable()
 export class EpisodeService {
@@ -22,6 +23,7 @@ export class EpisodeService {
     private fileService: FileService,
     private subtitlesService: SubtitlesService,
     private mediainfoService: MediainfoService,
+    private seasonService: SeasonService,
   ) {}
 
   async createEpisode(videoTmpPath: string, dto: CreateEpisodeDto) {
@@ -203,12 +205,10 @@ export class EpisodeService {
 
   async getByOrder(
     seasonOrder: number,
-    seriesId: number,
+    seriesSlug: string,
     episodeOrder: number,
   ): Promise<Episode & { subtitles: Subtitles[] }> {
-    const season = await this.prismaService.season.findFirst({
-      where: { seriesId: seriesId, order: seasonOrder },
-    });
+    const season = await this.seasonService.getByOrder(seriesSlug, seasonOrder);
 
     if (!season) {
       throw new HttpException('Сезон с таким порядковым номером не найден', HttpStatus.NOT_FOUND);

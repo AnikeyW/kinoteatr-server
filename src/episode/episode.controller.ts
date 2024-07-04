@@ -48,7 +48,7 @@ const storage = diskStorage({
 export class EpisodeController {
   constructor(private episodeService: EpisodeService) {}
 
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post()
   @UseInterceptors(FileFieldsInterceptor([{ name: 'video', maxCount: 1 }], { storage: storage }))
   createEpisode(@UploadedFiles() files, @Body() dto: CreateEpisodeDto) {
@@ -69,7 +69,7 @@ export class EpisodeController {
     return this.episodeService.editEpisode(dto, Number(episodeId), newSubtitles);
   }
 
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   deleteEpisode(@Param('id') episodeId) {
     return this.episodeService.deleteEpisode(+episodeId);
@@ -79,9 +79,9 @@ export class EpisodeController {
   getByOrder(
     @Param('order') order,
     @Query('season_order') seasonOrder,
-    @Query('series_id') seriesId,
+    @Query('series_slug') seriesSlug,
   ) {
-    return this.episodeService.getByOrder(Number(seasonOrder), Number(seriesId), Number(order));
+    return this.episodeService.getByOrder(Number(seasonOrder), seriesSlug, Number(order));
   }
 
   @Get('byId/:id')

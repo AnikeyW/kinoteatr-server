@@ -8,6 +8,7 @@ import { Mp4boxService } from '../mp4box/mp4box.service';
 import { SubtitlesService } from '../subtitles/subtitles.service';
 import { MediainfoService } from '../mediainfo/mediainfo.service';
 import { GuidesService } from '../guides/guides.service';
+import { SeasonService } from '../season/season.service';
 
 @Module({
   controllers: [EpisodeController],
@@ -20,6 +21,7 @@ import { GuidesService } from '../guides/guides.service';
     SubtitlesService,
     MediainfoService,
     GuidesService,
+    SeasonService,
   ],
 })
 export class EpisodeModule {}
