@@ -22,6 +22,7 @@ import * as uuid from 'uuid';
 import * as fs from 'fs';
 import { EditEpisodeDto } from './dto/edit-episode.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Timeout } from '../common/decorators/timeout.decorator';
 
 const storage = diskStorage({
   destination: function (req, file, cb) {
@@ -50,6 +51,7 @@ export class EpisodeController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
+  @Timeout(1200000) //20 min
   @UseInterceptors(FileFieldsInterceptor([{ name: 'video', maxCount: 1 }], { storage: storage }))
   createEpisode(@UploadedFiles() files, @Body() dto: CreateEpisodeDto) {
     const { video } = files;

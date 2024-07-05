@@ -15,6 +15,8 @@ import { GuidesModule } from './guides/guides.module';
 import { SubtitlesModule } from './subtitles/subtitles.module';
 import { MediainfoModule } from './mediainfo/mediainfo.module';
 import * as process from 'process';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 
 @Module({
   imports: [
@@ -42,6 +44,12 @@ import * as process from 'process';
     GuidesModule,
     SubtitlesModule,
     MediainfoModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TimeoutInterceptor,
+    },
   ],
 })
 export class AppModule {}
