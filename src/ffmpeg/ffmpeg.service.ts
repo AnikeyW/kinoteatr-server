@@ -263,17 +263,28 @@ export class FfmpegService {
     try {
       const removeBrackets = (str) => str.replace(/[\[\]]/g, '');
 
-      const subtitlesInfo = videoInfo.subtitlesInfo.map((subtitle) => {
+      const subtitlesInfo = videoInfo.subtitlesInfo.reduce((acc, subtitle) => {
         const language = subtitle.language || 'und';
         const title = subtitle.title
           ? removeBrackets(subtitle.title)
           : this.guidesService.getLanguageNameByLangCode(language);
 
-        return {
+        let createdName = `(${language})_${title}`;
+        let counter = 1;
+
+        // Проверяем, существует ли уже такое название в аккумуляторе
+        while (acc.some((s) => s.createdName === createdName)) {
+          createdName = `(${language})_${title}_${counter}`;
+          counter++;
+        }
+
+        acc.push({
           ...subtitle,
-          createdName: `(${language})_${title}`,
-        };
-      });
+          createdName,
+        });
+
+        return acc;
+      }, []);
 
       const subsExtByCodec = {
         subrip: 'srt',
