@@ -262,11 +262,12 @@ export class FfmpegService {
   ): Promise<ExtractedSubtitlesWithCreatedName[]> {
     try {
       const removeBrackets = (str) => str.replace(/[\[\]]/g, '');
+      const sanitizeFilename = (str) => str.replace(/[ |]/g, '_');
 
       const subtitlesInfo = videoInfo.subtitlesInfo.reduce((acc, subtitle) => {
         const language = subtitle.language || 'und';
         const title = subtitle.title
-          ? removeBrackets(subtitle.title)
+          ? sanitizeFilename(removeBrackets(subtitle.title))
           : this.guidesService.getLanguageNameByLangCode(language);
 
         let createdName = `(${language})_${title}`;
