@@ -185,6 +185,7 @@ export class EpisodeService {
         skipRepeatEnd: dto.skipRepeat ? Number(dto.skipRepeatEnd) : null,
         width: Number(dto.width),
         height: Number(dto.height),
+        defaultSubtitle: dto.defaultSubtitle ? dto.defaultSubtitle : null,
       },
       include: { subtitles: true },
     });

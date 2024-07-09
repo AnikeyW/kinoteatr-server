@@ -18,4 +18,5 @@ export class EditEpisodeDto {
   readonly existSubtitles: string;
   readonly width: string;
   readonly height: string;
+  readonly defaultSubtitle?: string;
 }
