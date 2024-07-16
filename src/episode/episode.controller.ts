@@ -77,7 +77,7 @@ export class EpisodeController {
     return this.episodeService.deleteEpisode(+episodeId);
   }
 
-  @Get(':order')
+  @Get('/byOrder/:order')
   getByOrder(
     @Param('order') order,
     @Query('season_order') seasonOrder,
@@ -89,5 +89,10 @@ export class EpisodeController {
   @Get('byId/:id')
   getById(@Param('id') episodeId) {
     return this.episodeService.getById(Number(episodeId));
+  }
+
+  @Get('getAll')
+  getAllBySeriesSlug(@Query('series_slug') seriesSlug) {
+    return this.episodeService.getAllBySeriesSlug(seriesSlug);
   }
 }

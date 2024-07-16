@@ -272,6 +272,14 @@ export class EpisodeService {
     }
   }
 
+  async getAllBySeriesSlug(seriesSlug: string): Promise<Episode[]> {
+    const series = await this.prismaService.series.findFirst({ where: { slug: seriesSlug } });
+    const seasons = await this.prismaService.season.findMany({ where: { seriesId: series.id } });
+    const seasonsIds = seasons.map((season) => season.id);
+
+    return this.prismaService.episode.findMany({ where: { seasonId: { in: seasonsIds } } });
+  }
+
   private async deleteTemporaryFiles(filesToDelete: string[]): Promise<void> {
     try {
       for (const filePath of filesToDelete) {
