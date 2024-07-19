@@ -66,9 +66,27 @@ export class SeasonService {
     }
   }
 
-  async getById(seasonId: number, seriesId: number): Promise<Season> {
+  // async getById(seasonId: number, seriesId: number): Promise<Season> {
+  //   const season = await this.prismaService.season.findUnique({
+  //     where: { seriesId: seriesId, id: seasonId },
+  //     include: {
+  //       episodes: {
+  //         where: { seasonId },
+  //         orderBy: { order: 'asc' },
+  //       },
+  //     },
+  //   });
+  //
+  //   if (!season) {
+  //     throw new HttpException('Сезон с таким Id не найден', HttpStatus.NOT_FOUND);
+  //   }
+  //
+  //   return season;
+  // }
+
+  async getById(seasonId: number): Promise<Season> {
     const season = await this.prismaService.season.findUnique({
-      where: { seriesId: seriesId, id: seasonId },
+      where: { id: seasonId },
       include: {
         episodes: {
           where: { seasonId },

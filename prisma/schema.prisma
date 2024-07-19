@@ -20,6 +20,7 @@ model Series {
   countries     Countries[] @relation("SeriesToCountry")
   seasons       Season[]    @relation("SeriesToSeason")
   genres        Genre[]     @relation("SeriesToGenre")
+  playlist      String      @default("")
 }
 
 model Season {

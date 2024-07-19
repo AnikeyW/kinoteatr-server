@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { forwardRef, HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import * as fs from 'fs';
 import { CreateEpisodeDto } from './dto/create-episode.dto';
 import { Episode, Subtitles } from '@prisma/client';
@@ -13,10 +13,14 @@ import { EditEpisodeDto, IExistSubtitles } from './dto/edit-episode.dto';
 import { SubtitlesService } from '../subtitles/subtitles.service';
 import { MediainfoService } from '../mediainfo/mediainfo.service';
 import { SeasonService } from '../season/season.service';
+import { SeriesService } from '../series/series.service';
+import { EpisodeWithSubtitles } from './episode.types';
 
 @Injectable()
 export class EpisodeService {
   constructor(
+    @Inject(forwardRef(() => SeriesService))
+    private seriesService: SeriesService,
     private prismaService: PrismaService,
     private ffmpegService: FfmpegService,
     private mp4boxService: Mp4boxService,
@@ -94,6 +98,12 @@ export class EpisodeService {
             },
           });
         })
+        .then(async () => {
+          const season = await this.seasonService.getById(Number(dto.seasonId));
+
+          const series = await this.seriesService.getById(season.seriesId);
+          await this.seriesService.createPlaylist(series.slug);
+        })
         .then(() => {
           this.deleteTemporaryFiles([videoTmpPath]);
         })
@@ -168,6 +178,20 @@ export class EpisodeService {
       };
 
       await saveSubtitles(newSubtitlesTmpList);
+    }
+
+    try {
+      const episode = await this.getById(episodeId);
+
+      const season = await this.seasonService.getById(Number(episode.seasonId));
+
+      const series = await this.seriesService.getById(season.seriesId);
+      await this.seriesService.createPlaylist(series.slug);
+    } catch (e) {
+      throw new HttpException(
+        'failed create playlist from edit episode',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
 
     return this.prismaService.episode.update({
@@ -266,13 +290,19 @@ export class EpisodeService {
 
       // Удалить эпизод из БД
       await this.prismaService.episode.delete({ where: { id: episodeId } });
+
+      const season = await this.seasonService.getById(Number(episode.seasonId));
+
+      const series = await this.seriesService.getById(season.seriesId);
+      await this.seriesService.createPlaylist(series.slug);
+
       return episode;
     } catch (e) {
       throw new HttpException('Ошибка удаления', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
-  async getAllBySeriesSlug(seriesSlug: string): Promise<Episode[]> {
+  async getAllBySeriesSlug(seriesSlug: string): Promise<EpisodeWithSubtitles[]> {
     const series = await this.prismaService.series.findFirst({ where: { slug: seriesSlug } });
     const seasons = await this.prismaService.season.findMany({ where: { seriesId: series.id } });
     const seasonsIds = seasons.map((season) => season.id);

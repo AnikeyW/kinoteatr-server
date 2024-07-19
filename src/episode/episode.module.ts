@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { EpisodeController } from './episode.controller';
 import { EpisodeService } from './episode.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -10,9 +10,10 @@ import { MediainfoService } from '../mediainfo/mediainfo.service';
 import { GuidesService } from '../guides/guides.service';
 import { SeasonService } from '../season/season.service';
 import { CacheModule } from '@nestjs/cache-manager';
+import { SeriesModule } from '../series/series.module';
 
 @Module({
-  imports: [CacheModule.register()],
+  imports: [forwardRef(() => SeriesModule), CacheModule.register()],
   controllers: [EpisodeController],
   providers: [
     EpisodeService,
@@ -25,5 +26,6 @@ import { CacheModule } from '@nestjs/cache-manager';
     GuidesService,
     SeasonService,
   ],
+  exports: [EpisodeService],
 })
 export class EpisodeModule {}

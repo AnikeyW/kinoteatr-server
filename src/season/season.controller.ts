@@ -39,8 +39,10 @@ export class SeasonController {
   }
 
   @Get('byId/:id')
-  getById(@Param('id') seasonId, @Query('series_id') seriesId) {
-    return this.seasonService.getById(Number(seasonId), Number(seriesId));
+  getById(@Param('id') seasonId) {
+    // getById(@Param('id') seasonId, @Query('series_id') seriesId) {
+    // return this.seasonService.getById(Number(seasonId), Number(seriesId));
+    return this.seasonService.getById(Number(seasonId));
   }
 
   @Get(':order')

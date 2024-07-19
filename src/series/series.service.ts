@@ -1,13 +1,19 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { forwardRef, HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSeriesDto } from './dto/create-series.dto';
-import { Series } from '@prisma/client';
+import { Season, Series } from '@prisma/client';
 import { FileService, FileTypes } from '../file/file.service';
 import { EditSeriesDto } from './dto/edit-series.dto';
+import { EpisodeService } from '../episode/episode.service';
+import { subLabelFromSubSrc } from '../common/utils';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class SeriesService {
   constructor(
+    @Inject(forwardRef(() => EpisodeService))
+    private episodeService: EpisodeService,
     private prismaService: PrismaService,
     private fileService: FileService,
   ) {}
@@ -134,7 +140,9 @@ export class SeriesService {
     }
   }
 
-  async getById(seriesId: number): Promise<any> {
+  async getById(
+    seriesId: number,
+  ): Promise<Series & { countries: string[]; genres: string[]; seasons: Season[] }> {
     const series = await this.prismaService.series.findUnique({
       where: { id: seriesId },
       include: {
@@ -161,7 +169,9 @@ export class SeriesService {
     };
   }
 
-  async getBySlug(slug: string) {
+  async getBySlug(
+    slug: string,
+  ): Promise<Series & { countries: string[]; genres: string[]; seasons: Season[] }> {
     const series = await this.prismaService.series.findFirst({
       where: { slug: slug },
       include: {
@@ -189,5 +199,105 @@ export class SeriesService {
 
   async getManySeries(skip: number, take: number): Promise<Series[]> {
     return this.prismaService.series.findMany({ skip, take });
+  }
+
+  async createPlaylist(seriesSlug: string) {
+    const series = await this.getBySlug(seriesSlug);
+
+    const allEpisodes = await this.episodeService.getAllBySeriesSlug(seriesSlug);
+
+    if (!series || !allEpisodes)
+      throw new HttpException('series or allEpisodes not found', HttpStatus.BAD_REQUEST);
+
+    const baseUrl = process.env.SERVER_URL_STATIC.split('/api/static/')[0] + '/';
+
+    const playlist: any = [];
+
+    series.seasons
+      .sort((a, b) => a.order - b.order)
+      .forEach((season) => {
+        const playlistSeason: any = {
+          title: `Сезон ${season.order}`,
+          folder: [],
+        };
+        const seasonEpisodes = allEpisodes.filter((episode) => episode.seasonId === season.id);
+
+        seasonEpisodes
+          .sort((a, b) => a.order - b.order)
+          .forEach((episode) => {
+            const playlistFile: Record<string, string | number> = {};
+
+            playlistFile.id = episode.id;
+
+            playlistFile.title = `Серия ${episode.order}`;
+
+            const videoName = episode.srcHls.replace(/\\/g, '/').split('/')[1];
+            playlistFile.file = `${baseUrl}{v1}/${videoName}/{v2}`;
+
+            playlistFile.poster = `${process.env.SERVER_URL_STATIC}${episode.poster.replace(/\\/g, '/')}`;
+
+            playlistFile.update_skipIntro = episode.skipIntro ? episode.skipIntro : 99999;
+
+            playlistFile.update_skipIntroEnd = episode.skipIntroEnd ? episode.skipIntroEnd : 999999;
+
+            playlistFile.update_skipRepeat = episode.skipRepeat ? episode.skipRepeat : 0;
+
+            playlistFile.update_skipRepeatEnd = episode.skipRepeatEnd ? episode.skipRepeatEnd : 0;
+
+            playlistFile.update_skipCredits = episode.skipCredits ? episode.skipCredits : 99999;
+
+            if (episode.subtitles.length > 0) {
+              let subtitlesSrc = '';
+
+              episode.subtitles.forEach((sub, index) => {
+                const subLabel = subLabelFromSubSrc(sub.src);
+                if (index === episode.subtitles.length - 1) {
+                  subtitlesSrc += `[${subLabel}]${process.env.SERVER_URL_STATIC + episode.subtitles[index].src.replace(/\\/g, '/')}`;
+                } else {
+                  subtitlesSrc += `[${subLabel}]${process.env.SERVER_URL_STATIC + episode.subtitles[index].src.replace(/\\/g, '/')},`;
+                }
+              });
+
+              playlistFile.subtitle = subtitlesSrc;
+            }
+
+            if (episode.defaultSubtitle) {
+              playlistFile.default_subtitle = subLabelFromSubSrc(episode.defaultSubtitle);
+            }
+
+            playlistSeason.folder.push(playlistFile);
+          });
+
+        playlist.push(playlistSeason);
+      });
+
+    const playlistFolderPath = path.join(__dirname, '..', '..', 'static', 'playlists');
+    const playlistPath = path.join(playlistFolderPath, `${seriesSlug}.txt`);
+
+    if (!fs.existsSync(playlistFolderPath)) {
+      try {
+        fs.mkdirSync(playlistFolderPath, { recursive: true });
+      } catch (err) {
+        throw new HttpException(
+          'Error creating playlists directory',
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+    }
+
+    try {
+      fs.writeFileSync(playlistPath, JSON.stringify(playlist), 'utf8');
+    } catch (err) {
+      throw new HttpException('Error writing playlist to file', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    const playlistPathStatic = path.join('playlists', `${seriesSlug}.txt`).replace(/\\/g, '/');
+
+    await this.prismaService.series.update({
+      where: { id: series.id },
+      data: { playlist: playlistPathStatic },
+    });
+
+    return playlistPathStatic;
   }
 }
