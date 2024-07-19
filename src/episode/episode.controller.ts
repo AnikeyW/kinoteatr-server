@@ -5,6 +5,7 @@ import {
   Get,
   HttpException,
   HttpStatus,
+  Inject,
   Param,
   Post,
   Query,
@@ -23,6 +24,8 @@ import * as fs from 'fs';
 import { EditEpisodeDto } from './dto/edit-episode.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Timeout } from '../common/decorators/timeout.decorator';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 
 const storage = diskStorage({
   destination: function (req, file, cb) {
@@ -47,7 +50,10 @@ const storage = diskStorage({
 
 @Controller('episode')
 export class EpisodeController {
-  constructor(private episodeService: EpisodeService) {}
+  constructor(
+    private episodeService: EpisodeService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -92,7 +98,14 @@ export class EpisodeController {
   }
 
   @Get('getAll')
-  getAllBySeriesSlug(@Query('series_slug') seriesSlug) {
-    return this.episodeService.getAllBySeriesSlug(seriesSlug);
+  async getAllBySeriesSlug(@Query('series_slug') seriesSlug) {
+    const cacheKey = `getAllEpisodesBySeriesSlug:${seriesSlug}`;
+    const cachedData = await this.cacheManager.get(cacheKey);
+    if (cachedData) {
+      return cachedData;
+    }
+    const data = await this.episodeService.getAllBySeriesSlug(seriesSlug);
+    await this.cacheManager.set(cacheKey, data, 60000); //1 min
+    return data;
   }
 }

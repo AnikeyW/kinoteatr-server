@@ -277,7 +277,10 @@ export class EpisodeService {
     const seasons = await this.prismaService.season.findMany({ where: { seriesId: series.id } });
     const seasonsIds = seasons.map((season) => season.id);
 
-    return this.prismaService.episode.findMany({ where: { seasonId: { in: seasonsIds } } });
+    return this.prismaService.episode.findMany({
+      where: { seasonId: { in: seasonsIds } },
+      include: { subtitles: true },
+    });
   }
 
   private async deleteTemporaryFiles(filesToDelete: string[]): Promise<void> {

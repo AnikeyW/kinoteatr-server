@@ -9,8 +9,10 @@ import { SubtitlesService } from '../subtitles/subtitles.service';
 import { MediainfoService } from '../mediainfo/mediainfo.service';
 import { GuidesService } from '../guides/guides.service';
 import { SeasonService } from '../season/season.service';
+import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
+  imports: [CacheModule.register()],
   controllers: [EpisodeController],
   providers: [
     EpisodeService,
