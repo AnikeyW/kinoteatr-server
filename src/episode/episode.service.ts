@@ -181,13 +181,18 @@ export class EpisodeService {
     }
 
     try {
-      const episode = await this.getById(episodeId);
+      const episode = await this.getById(Number(episodeId));
+      console.log('episode', episode);
 
       const season = await this.seasonService.getById(Number(episode.seasonId));
+      console.log('season', season);
 
-      const series = await this.seriesService.getById(season.seriesId);
+      const series = await this.seriesService.getById(Number(season.seriesId));
+
+      console.log('series', series);
       await this.seriesService.createPlaylist(series.slug);
     } catch (e) {
+      console.log(e);
       throw new HttpException(
         'failed create playlist from edit episode',
         HttpStatus.INTERNAL_SERVER_ERROR,
