@@ -25,7 +25,9 @@ async function bootstrap() {
     // preflightContinue: false,
     // credentials: true,
     // optionsSuccessStatus: 200,
-    origin: [process.env.CLIENT_URL, 'https://player-holotv.ru'],
+
+    // origin: [process.env.CLIENT_URL, 'https://player-holotv.ru'],
+    origin: '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Origin,X-Requested-With,Content-Type,Accept,Authorization',
     preflightContinue: false,
