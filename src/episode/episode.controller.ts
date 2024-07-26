@@ -67,7 +67,7 @@ export class EpisodeController {
     return this.episodeService.createEpisode(video[0].path, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @Post(':id')
   @UseInterceptors(
     FileFieldsInterceptor([{ name: 'newSubtitles', maxCount: 15 }], { storage: storage }),
