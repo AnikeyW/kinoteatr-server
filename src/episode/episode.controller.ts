@@ -55,7 +55,7 @@ export class EpisodeController {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @Post()
   @Timeout(1200000) //20 min
   @UseInterceptors(FileFieldsInterceptor([{ name: 'video', maxCount: 1 }], { storage: storage }))

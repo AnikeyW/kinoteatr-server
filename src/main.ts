@@ -20,13 +20,6 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
   app.use(cookieParser());
   app.enableCors({
-    // origin: [process.env.CLIENT_URL, 'https://player-holotv.ru'],
-    // methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    // preflightContinue: false,
-    // credentials: true,
-    // optionsSuccessStatus: 200,
-
-    // origin: [process.env.CLIENT_URL, 'https://player-holotv.ru'],
     origin: [
       process.env.CLIENT_URL,
       'https://player-holotv.ru',
