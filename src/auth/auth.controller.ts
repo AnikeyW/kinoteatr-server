@@ -11,7 +11,6 @@ import {
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import * as process from 'process';
 
 @Controller('auth')
 export class AuthController {
@@ -27,24 +26,24 @@ export class AuthController {
   async login(@Req() req, @Res() res) {
     const userData = await this.authService.login(req.user);
 
-    const clientUrl = new URL(process.env.CLIENT_URL);
-    const clientDomain = clientUrl.hostname;
+    // const clientUrl = new URL(process.env.CLIENT_URL);
+    // const clientDomain = clientUrl.hostname;
 
     res.cookie('refreshToken', userData.refreshToken, {
       maxAge: 30 * 24 * 60 * 60 * 1000,
       httpOnly: true,
       sameSite: 'none',
       secure: true,
-      domain: `${clientDomain}`,
-      crossSite: true,
+      // domain: `${clientDomain}`,
+      // crossSite: true,
     });
     res.cookie('accessToken', userData.accessToken, {
       maxAge: 15 * 60 * 1000,
       httpOnly: true,
       sameSite: 'none',
       secure: true,
-      domain: `${clientDomain}`,
-      crossSite: true,
+      // domain: `${clientDomain}`,
+      // crossSite: true,
     });
 
     const { admin } = userData;
@@ -77,25 +76,18 @@ export class AuthController {
       throw new HttpException('В Cookies отсутствует refreshToken', HttpStatus.UNAUTHORIZED);
     }
 
-    const clientUrl = new URL(process.env.CLIENT_URL);
-    const clientDomain = clientUrl.hostname;
-
     const userData = await this.authService.refresh(refreshToken);
     res.cookie('refreshToken', userData.refreshToken, {
       maxAge: 30 * 24 * 60 * 60 * 1000,
       httpOnly: true,
       sameSite: 'none',
       secure: true,
-      domain: `${clientDomain}`,
-      crossSite: true,
     });
     res.cookie('accessToken', userData.accessToken, {
       maxAge: 15 * 60 * 1000,
       httpOnly: true,
       sameSite: 'none',
       secure: true,
-      domain: `${clientDomain}`,
-      crossSite: true,
     });
 
     return res.json({ admin: userData.admin });
