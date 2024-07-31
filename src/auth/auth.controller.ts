@@ -35,14 +35,14 @@ export class AuthController {
       httpOnly: true,
       sameSite: 'none',
       secure: true,
-      domain: clientDomain,
+      domain: `.${clientDomain}`,
     });
     res.cookie('accessToken', userData.accessToken, {
       maxAge: 15 * 60 * 1000,
       httpOnly: true,
       sameSite: 'none',
       secure: true,
-      domain: clientDomain,
+      domain: `.${clientDomain}`,
     });
 
     const { admin } = userData;
@@ -84,14 +84,14 @@ export class AuthController {
       httpOnly: true,
       sameSite: 'none',
       secure: true,
-      domain: clientDomain,
+      domain: `.${clientDomain}`,
     });
     res.cookie('accessToken', userData.accessToken, {
       maxAge: 15 * 60 * 1000,
       httpOnly: true,
       sameSite: 'none',
       secure: true,
-      domain: clientDomain,
+      domain: `.${clientDomain}`,
     });
 
     return res.json({ admin: userData.admin });
