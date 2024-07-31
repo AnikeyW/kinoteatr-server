@@ -27,7 +27,7 @@ async function bootstrap() {
       'https://localhost:5173',
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Origin,X-Requested-With,Content-Type,Accept,Authorization',
+    allowedHeaders: 'Origin,X-Requested-With,Content-Type,Accept,Authorization,Set-Cookie',
     preflightContinue: false,
     credentials: true,
     optionsSuccessStatus: 204,
