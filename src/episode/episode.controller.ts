@@ -55,7 +55,7 @@ export class EpisodeController {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post()
   @Timeout(1200000) //20 min
   @UseInterceptors(FileFieldsInterceptor([{ name: 'video', maxCount: 1 }], { storage: storage }))
@@ -67,7 +67,7 @@ export class EpisodeController {
     return this.episodeService.createEpisode(video[0].path, dto);
   }
 
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post(':id')
   @UseInterceptors(
     FileFieldsInterceptor([{ name: 'newSubtitles', maxCount: 15 }], { storage: storage }),
